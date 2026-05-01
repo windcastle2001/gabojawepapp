@@ -8,6 +8,9 @@ declare global {
         Size: new (width: number, height: number) => unknown;
         Point: new (x: number, y: number) => unknown;
         MarkerImage: new (src: string, size: unknown, options?: { offset?: unknown }) => unknown;
+        LatLngBounds: new () => {
+          extend: (latLng: unknown) => void;
+        };
         Marker: new (options: { map: unknown; position: unknown; title?: string; image?: unknown }) => {
           setMap: (map: unknown | null) => void;
         };
@@ -18,6 +21,7 @@ declare global {
         Map: new (container: HTMLElement, options: { center: unknown; level: number }) => {
           setCenter: (latLng: unknown) => void;
           setLevel: (level: number) => void;
+          setBounds: (bounds: unknown) => void;
         };
         event: {
           addListener: (target: unknown, eventName: string, handler: () => void) => void;

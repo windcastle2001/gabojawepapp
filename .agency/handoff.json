@@ -1,24 +1,27 @@
 {
   "from": "directorcode (Codex)",
-  "to": "front-coder / qa follow-up",
-  "timestamp": "2026-05-01T14:30:00Z",
-  "status": "prototype_map_wishlist_upgrade",
+  "to": "next director / backend persistence",
+  "timestamp": "2026-05-02T00:00:00+09:00",
+  "status": "prototype_polish_auth_ai_map_invite",
   "phase": "prototype_feature_polish",
-  "summary": "가자고 프로토타입의 위시리스트와 커뮤니티 맵 흐름을 다시 묶었다. 위시 완료 팝업에서 커뮤니티 맵 공유를 바로 선택할 수 있게 했고, 지도 페이지에는 내 주변 필터, 수동 제보 모달, 카카오 장소 검색 결과 등록, 네이버/카카오 링크 기반 등록 진입을 추가했다.",
+  "summary": "Rebuilt the visible prototype flow in clean Korean. Google OAuth now leads into group creation, invite links can be accepted at /join/[code], Kakao map has visible fallback diagnostics, place search has REST fallback, AI is segmented into course/wishlist/link flows, and wishlist completion can publish a map pin locally.",
   "completed_steps": [
-    "lib/prototype-store.ts를 정리해 sourceType, sourceLabel, sourceUrl, 수동 커뮤니티 추가 helper를 도입",
-    "app/app/wishlist/page.tsx를 재구성해 공유 상태, 저장 출처, 완료 팝업 내 커뮤니티 공유 토글을 반영",
-    "app/app/map/page.tsx를 재구성해 내 주변, 제보하기, 카카오 검색 결과 시트, 링크 등록 진입을 구현",
-    "components/map/KakaoMap.tsx에 services library 로드를 추가해 카카오 장소 검색 사용 가능 상태로 확장",
-    "app/api/capture/route.ts를 프로토타입 모드에서도 링크 파싱을 호출할 수 있게 조정",
-    "npm run build 통과"
+    "Added /api/groups/ensure, /api/groups/join, and /join/[code] for real Supabase-backed invite acceptance.",
+    "Connected login mode selection to /api/groups/ensure for Google users.",
+    "Rebuilt app home, sidebar, map, wishlist, and AI pages with clean Korean copy.",
+    "Added /api/kakao/search using KAKAO_REST_API_KEY as fallback when Kakao JS SDK services are not available.",
+    "Guarded /api/capture and capture cache so prototype mode and missing optional envs do not crash the route.",
+    "Kept Gemini calls centralized on gemini-3.0-flash only.",
+    "Ran npm run build successfully."
   ],
   "next_steps": [
-    "실제 브라우저에서 3002 포트 기준 카카오 검색 결과와 링크 등록 UX를 수동 점검",
-    "app/app/ai/page.tsx와 일부 오래된 깨진 문구 파일을 같은 톤으로 정리",
-    "링크 파싱 결과가 약한 케이스에서 카테고리/주소 보정 UX를 추가할지 판단"
+    "Apply schema.sql to Supabase if not already applied; groups/group_members/users are required for invite APIs.",
+    "Implement Supabase-backed wishlist/community persistence so partners and friends see shared pins across devices.",
+    "Smoke-test deployed Vercel domain in Kakao Developers JavaScript SDK domain settings and Supabase OAuth redirect URL settings.",
+    "If Gemini rejects gemini-3.0-flash, confirm the exact model id enabled in the user's Gemini project and update lib/ai/model.ts only if the user approves."
   ],
   "blockers": [
-    "npx tsc --noEmit --incremental false 는 tsconfig의 .next/types include 특성 때문에 여전히 독립 실행 시 실패한다. 빌드 자체는 정상 통과."
+    "Cross-device shared pins are not fully persisted yet; current map share is local prototype storage.",
+    "gemini-3.0-flash model availability depends on the user's Gemini API account/project."
   ]
 }

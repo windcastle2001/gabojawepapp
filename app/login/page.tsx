@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button, Card } from '@/components/ui';
 import { createPrototypeSession, saveSession, type AuthMode, type GroupType } from '@/lib/prototype-store';
 import { createClient } from '@/lib/supabase/client';
+import type { GroupSnapshot } from '@/lib/groups';
 import { cn } from '@/lib/utils';
 
 function GoogleIcon() {
@@ -88,6 +89,7 @@ export default function LoginPage() {
   const [authMode, setAuthMode] = useState<AuthMode | null>(null);
   const [groupType, setGroupType] = useState<GroupType>('couple');
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isEntering, setIsEntering] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -100,9 +102,45 @@ export default function LoginPage() {
     }
   }, []);
 
-  function enterApp(mode: AuthMode, type: GroupType) {
-    saveSession(createPrototypeSession(mode, type));
-    router.push('/app');
+  async function enterApp(mode: AuthMode, type: GroupType) {
+    setIsEntering(true);
+    setAuthError(null);
+
+    try {
+      const session = createPrototypeSession(mode, type);
+
+      if (mode === 'google') {
+        const response = await fetch('/api/groups/ensure', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ groupType: type }),
+        });
+        const data = (await response.json()) as { group?: GroupSnapshot; error?: string };
+
+        if (!response.ok || !data.group) {
+          throw new Error(data.error ?? '초대 공간을 만들지 못했습니다.');
+        }
+
+        saveSession({
+          ...session,
+          inviteCode: data.group.inviteCode,
+          inviteUrl: data.group.inviteUrl,
+          remoteGroupId: data.group.id,
+          partnerAccepted: data.group.groupType === 'couple' ? data.group.memberCount >= 2 : false,
+          friendMembers: data.group.groupType === 'friends' ? data.group.memberCount : 1,
+          connectedAt: data.group.memberCount >= 2 ? new Date().toISOString().split('T')[0] : null,
+        });
+      } else {
+        saveSession(session);
+      }
+
+      router.push('/app');
+    } catch (error) {
+      console.error(error);
+      setAuthError(error instanceof Error ? error.message : '공간 생성 중 문제가 생겼어요.');
+    } finally {
+      setIsEntering(false);
+    }
   }
 
   async function signInWithGoogle() {
@@ -205,10 +243,17 @@ export default function LoginPage() {
               <Button
                 onClick={() => enterApp(authMode, groupType)}
                 variant={groupType === 'friends' ? 'secondary' : 'default'}
+                disabled={isEntering}
+                isLoading={isEntering}
               >
                 {groupType === 'couple' ? '커플 공간 시작하기' : '친구 모임 시작하기'}
               </Button>
             </div>
+            {authError && (
+              <p className="mt-3 rounded-xl bg-destructive/10 px-3 py-2 text-center text-xs font-medium text-destructive">
+                {authError}
+              </p>
+            )}
           </div>
         )}
       </section>

@@ -4,7 +4,8 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
-  const next = requestUrl.searchParams.get('next') ?? '/login?auth=google';
+  const requestedNext = requestUrl.searchParams.get('next') ?? '/login?auth=google';
+  const next = requestedNext.startsWith('/') && !requestedNext.startsWith('//') ? requestedNext : '/login?auth=google';
 
   if (!code) {
     return NextResponse.redirect(new URL('/login?error=oauth_no_code', requestUrl.origin));

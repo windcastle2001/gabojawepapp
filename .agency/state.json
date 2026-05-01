@@ -1,29 +1,50 @@
 {
   "project": "가자고",
   "version": "0.1.0-prototype",
-  "last_updated": "2026-05-01T14:30:00Z",
+  "last_updated": "2026-05-02T00:00:00+09:00",
   "current_phase": "prototype_feature_polish",
-  "active_blockers": [],
+  "active_blockers": [
+    {
+      "id": "REMOTE-DATA-1",
+      "description": "Wishlist/community pins still use local prototype storage for most flows. Real cross-device sharing requires Supabase persistence for wishlist, public_places, and community_reviews.",
+      "severity": "medium"
+    },
+    {
+      "id": "GEMINI-MODEL-1",
+      "description": "User explicitly requested gemini-3.0-flash only. If Google API rejects that model id in the connected account, AI routes will show fallback diagnostics until the exact enabled model id is adjusted.",
+      "severity": "medium"
+    }
+  ],
   "completed_critical_fixes": [
     {
-      "blocker_id": "MAP-2",
-      "description": "커뮤니티 맵에 내 주변 필터, 수동 제보, 카카오 장소 검색 결과 등록, 링크 기반 등록 진입 추가",
-      "fixed_at": "2026-05-01T14:30:00Z"
+      "blocker_id": "AUTH-1",
+      "description": "Google login now calls Supabase OAuth callback and creates/loads a real group invite snapshot through /api/groups/ensure.",
+      "fixed_at": "2026-05-02T00:00:00+09:00"
     },
     {
-      "blocker_id": "WISH-2",
-      "description": "위시리스트 완료 팝업에서 커뮤니티 맵 공유를 바로 선택할 수 있게 하고, 저장 출처/공유 상태를 카드에 반영",
-      "fixed_at": "2026-05-01T14:30:00Z"
+      "blocker_id": "INVITE-1",
+      "description": "Added /join/[code] and /api/groups/join so a second user can accept a real invite after Google login.",
+      "fixed_at": "2026-05-02T00:00:00+09:00"
     },
     {
-      "blocker_id": "DATA-2",
-      "description": "prototype-store를 정리해 위시/커뮤니티 장소의 source metadata와 수동 커뮤니티 추가 helper를 추가",
-      "fixed_at": "2026-05-01T14:30:00Z"
+      "blocker_id": "MAP-3",
+      "description": "Kakao map loading now keeps a visible fallback diagnostic and Kakao place search can use a REST API fallback when the JS SDK services are unavailable.",
+      "fixed_at": "2026-05-02T00:00:00+09:00"
+    },
+    {
+      "blocker_id": "AI-1",
+      "description": "AI page now has segmented plan, wishlist, and link extraction flows using gemini-3.0-flash only, with readable diagnostics and fallbacks.",
+      "fixed_at": "2026-05-02T00:00:00+09:00"
+    },
+    {
+      "blocker_id": "TEXT-1",
+      "description": "Cleaned mojibake in app/components/lib paths and rebuilt primary app screens in readable Korean.",
+      "fixed_at": "2026-05-02T00:00:00+09:00"
     }
   ],
   "pending_warnings": [
-    "일부 오래된 페이지와 문서 파일에 깨진 문자열이 남아 있다. 이번 턴에서 map/wishlist/store/capture는 정리했지만 ai page 등은 후속 정리가 필요하다.",
-    "Next.js workspace root 경고는 상위 package-lock.json 때문에 계속 출력된다.",
-    "tsconfig가 .next/types/**/*.ts 를 include 하고 있어 npx tsc 단독 실행은 환경에 따라 실패할 수 있다."
+    "Supabase SQL schema must be applied in the hosted project for real group invite APIs to work.",
+    "Vercel must include NEXT_PUBLIC_APP_URL, NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY, NEXT_PUBLIC_KAKAO_MAP_KEY, and KAKAO_REST_API_KEY.",
+    "Full cross-device wishlist/community persistence is the next backend step."
   ]
 }

@@ -1,6 +1,6 @@
 export interface NormalizedPayload {
   title: string;
-  category: '음식' | '카페' | '장소' | '선물' | '여행' | '영상참고' | '기타';
+  category: '맛집' | '카페' | '산책' | '액티비티' | '여행' | '영상참고' | '기타';
   address?: string;
   lat?: number;
   lng?: number;

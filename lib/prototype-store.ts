@@ -13,6 +13,8 @@ export interface PrototypeSession {
   friendMembers: number;
   inviteCode: string;
   connectedAt: string | null;
+  inviteUrl?: string | null;
+  remoteGroupId?: string | null;
 }
 
 export interface PrototypeWish {
@@ -89,19 +91,19 @@ export interface AddCommunityPlaceInput {
   sourceUrl?: string | null;
 }
 
-const SESSION_KEY = 'dm_session_v2';
-const WISHLIST_KEY = 'dm_wishlist_v2';
-const COMMUNITY_KEY = 'dm_community_places_v2';
+const SESSION_KEY = 'dm_session_v3';
+const WISHLIST_KEY = 'dm_wishlist_v3';
+const COMMUNITY_KEY = 'dm_community_places_v3';
 
 function today() {
   return new Date().toISOString().split('T')[0];
 }
 
 function createInviteCode(groupType: GroupType) {
-  return groupType === 'couple' ? 'DM-4821' : 'FR-7392';
+  return groupType === 'couple' ? 'CP-DEMO1' : 'FR-DEMO1';
 }
 
-function createDefaultReview(author: string, text: string, rating: number, reviewType: ReviewType, createdAt: string): PrototypeReview {
+function createReview(author: string, text: string, rating: number, reviewType: ReviewType, createdAt: string): PrototypeReview {
   return {
     id: Date.now() + Math.floor(Math.random() * 1000),
     author,
@@ -121,6 +123,8 @@ export function createPrototypeSession(authMode: AuthMode, groupType: GroupType)
     friendMembers: 1,
     inviteCode: createInviteCode(groupType),
     connectedAt: null,
+    inviteUrl: null,
+    remoteGroupId: null,
   };
 }
 
@@ -132,12 +136,14 @@ export const DEFAULT_SESSION: PrototypeSession = {
   friendMembers: 1,
   inviteCode: createInviteCode('couple'),
   connectedAt: null,
+  inviteUrl: null,
+  remoteGroupId: null,
 };
 
 export const DEFAULT_WISHLIST: PrototypeWish[] = [
   {
     id: 1,
-    title: '루프탑 성수',
+    title: '성수 루프탑 카페',
     type: 'place',
     category: '카페',
     address: '서울 성동구 성수이로 78',
@@ -157,7 +163,7 @@ export const DEFAULT_WISHLIST: PrototypeWish[] = [
   },
   {
     id: 2,
-    title: '모모당 연남',
+    title: '연남 브런치 카페',
     type: 'place',
     category: '카페',
     address: '서울 마포구 동교로 247',
@@ -167,7 +173,7 @@ export const DEFAULT_WISHLIST: PrototypeWish[] = [
     completedAt: null,
     review: null,
     rating: null,
-    tags: ['브런치', '조용한'],
+    tags: ['브런치', '조용함'],
     lat: 37.5564,
     lng: 126.9237,
     sharedToMap: false,
@@ -187,7 +193,7 @@ export const DEFAULT_WISHLIST: PrototypeWish[] = [
     completedAt: null,
     review: null,
     rating: null,
-    tags: ['기념일', '디너'],
+    tags: ['기념일', '저녁'],
     lat: 37.5219,
     lng: 127.0439,
     sharedToMap: false,
@@ -217,60 +223,22 @@ export const DEFAULT_WISHLIST: PrototypeWish[] = [
   },
   {
     id: 5,
-    title: '전시 보러 가기',
-    type: 'activity',
-    category: '액티비티',
-    address: null,
-    addedBy: 'me',
-    addedAt: '2026-04-15',
-    completed: false,
-    completedAt: null,
-    review: null,
-    rating: null,
-    tags: ['실내', '주말'],
-    sharedToMap: false,
-    sourceType: 'manual',
-    sourceLabel: '직접 저장',
-    sourceUrl: null,
-  },
-  {
-    id: 6,
-    title: '야구장 관람',
+    title: '잠실 야구장',
     type: 'activity',
     category: '액티비티',
     address: '서울 송파구 올림픽로 25',
-    addedBy: 'partner',
+    addedBy: 'member',
     addedAt: '2026-04-01',
     completed: true,
     completedAt: '2026-04-12',
-    review: '응원 분위기가 좋아서 다시 가고 싶었어요.',
+    review: '응원 분위기가 좋아서 친구들이랑 다시 가고 싶었어요.',
     rating: 5,
     tags: ['스포츠', '맥주'],
     lat: 37.5122,
     lng: 127.0719,
     sharedToMap: false,
     sourceType: 'manual',
-    sourceLabel: '파트너 저장',
-    sourceUrl: null,
-  },
-  {
-    id: 7,
-    title: '한강 피크닉',
-    type: 'activity',
-    category: '산책',
-    address: '서울 영등포구 여의동로 330',
-    addedBy: 'me',
-    addedAt: '2026-03-28',
-    completed: true,
-    completedAt: '2026-04-06',
-    review: '노을 자리 잡고 있기 좋았어요.',
-    rating: 4,
-    tags: ['피크닉', '야외'],
-    lat: 37.5284,
-    lng: 126.9336,
-    sharedToMap: false,
-    sourceType: 'manual',
-    sourceLabel: '직접 저장',
+    sourceLabel: '멤버 저장',
     sourceUrl: null,
   },
 ];
@@ -278,7 +246,7 @@ export const DEFAULT_WISHLIST: PrototypeWish[] = [
 export const DEFAULT_COMMUNITY_PLACES: PrototypeCommunityPlace[] = [
   {
     id: 101,
-    title: '루프탑 성수',
+    title: '성수 루프탑 카페',
     category: '카페',
     address: '서울 성동구 성수이로 78',
     rating: 4.7,
@@ -289,14 +257,14 @@ export const DEFAULT_COMMUNITY_PLACES: PrototypeCommunityPlace[] = [
     sourceLabel: '커뮤니티',
     sourceUrl: null,
     reviews: [
-      createDefaultReview('커플 유저', '사진 찍고 대화하기 좋았어요.', 5, 'couple', '2026-04-21'),
-      createDefaultReview('친구 모임 4명', '수다 떨기 편하고 좌석도 넉넉했어요.', 4, 'friends', '2026-04-22'),
-      createDefaultReview('커플 유저', '성수 데이트 코스로 붙이기 좋았어요.', 5, 'couple', '2026-04-23'),
+      createReview('커플 유저', '사진 찍고 대화하기 좋아요.', 5, 'couple', '2026-04-21'),
+      createReview('친구 모임 4명', '다 같이 앉기 편하고 좌석도 넉넉했어요.', 4, 'friends', '2026-04-22'),
+      createReview('커플 유저', '성수 데이트 코스로 붙이기 좋았어요.', 5, 'couple', '2026-04-23'),
     ],
   },
   {
     id: 102,
-    title: '한강 피크닉 스팟',
+    title: '여의도 한강공원',
     category: '산책',
     address: '서울 영등포구 여의동로 330',
     rating: 4.5,
@@ -307,8 +275,8 @@ export const DEFAULT_COMMUNITY_PLACES: PrototypeCommunityPlace[] = [
     sourceLabel: '커뮤니티',
     sourceUrl: null,
     reviews: [
-      createDefaultReview('친구 모임 3명', '돗자리 깔고 오래 있기 좋았어요.', 5, 'friends', '2026-04-18'),
-      createDefaultReview('커플 유저', '해질 때 가면 분위기가 진짜 좋아요.', 4, 'couple', '2026-04-19'),
+      createReview('친구 모임 3명', '돗자리 깔고 오래 있기 좋았어요.', 5, 'friends', '2026-04-18'),
+      createReview('커플 유저', '해질 때 가면 분위기가 좋아요.', 4, 'couple', '2026-04-19'),
     ],
   },
   {
@@ -324,8 +292,8 @@ export const DEFAULT_COMMUNITY_PLACES: PrototypeCommunityPlace[] = [
     sourceLabel: '커뮤니티',
     sourceUrl: null,
     reviews: [
-      createDefaultReview('커플 유저', '기념일 저녁으로 가기 좋은 분위기였어요.', 5, 'couple', '2026-04-15'),
-      createDefaultReview('친구 모임 4명', '여럿이 가도 메뉴 고르기 괜찮았어요.', 4, 'friends', '2026-04-16'),
+      createReview('커플 유저', '기념일 저녁으로 가기 좋은 분위기였어요.', 5, 'couple', '2026-04-15'),
+      createReview('친구 모임 4명', '여럿이 가도 메뉴 고르기 괜찮았어요.', 4, 'friends', '2026-04-16'),
     ],
   },
 ];
@@ -350,83 +318,21 @@ function writeJson<T>(key: string, value: T) {
 function normalizeSession(session: Partial<PrototypeSession>): PrototypeSession {
   const groupType = session.groupType === 'friends' ? 'friends' : session.groupType === 'couple' ? 'couple' : null;
   const partnerAccepted = Boolean(session.partnerAccepted && groupType === 'couple');
-
   return {
     authMode: session.authMode === 'google' ? 'google' : 'guest',
     groupType,
     onboardingComplete: Boolean(session.onboardingComplete && groupType),
     partnerAccepted,
     friendMembers: groupType === 'friends' ? Math.min(Math.max(session.friendMembers ?? 1, 1), 10) : 1,
-    inviteCode:
-      typeof session.inviteCode === 'string' && session.inviteCode.length > 0
-        ? session.inviteCode
-        : groupType
-          ? createInviteCode(groupType)
-          : createInviteCode('couple'),
-    connectedAt: partnerAccepted ? session.connectedAt ?? today() : null,
+    inviteCode: session.inviteCode || (groupType ? createInviteCode(groupType) : createInviteCode('couple')),
+    connectedAt: partnerAccepted || (groupType === 'friends' && (session.friendMembers ?? 1) > 1) ? session.connectedAt ?? today() : null,
+    inviteUrl: session.inviteUrl ?? null,
+    remoteGroupId: session.remoteGroupId ?? null,
   };
 }
 
 function resolveReviewAuthor(session: PrototypeSession) {
   return session.groupType === 'friends' ? `친구 모임 ${Math.max(session.friendMembers, 1)}명` : '커플 유저';
-}
-
-function upsertCommunityPlace(
-  places: PrototypeCommunityPlace[],
-  input: AddCommunityPlaceInput,
-  session?: PrototypeSession
-) {
-  const reviewType = input.reviewType ?? (session?.groupType === 'friends' ? 'friends' : 'couple');
-  const author = session ? resolveReviewAuthor(session) : '가자고 제보';
-  const note = input.note?.trim();
-  const rating = input.rating ?? 4;
-  const placeIndex = places.findIndex(
-    (place) => place.title.trim() === input.title.trim() || place.address.trim() === input.address.trim()
-  );
-
-  const review = note
-    ? createDefaultReview(author, note, rating, reviewType, today())
-    : null;
-
-  if (placeIndex >= 0) {
-    const current = places[placeIndex];
-    const nextReviews = review ? [review, ...current.reviews] : current.reviews;
-    const nextRating = nextReviews.length
-      ? Number((nextReviews.reduce((sum, item) => sum + item.rating, 0) / nextReviews.length).toFixed(1))
-      : current.rating;
-
-    places[placeIndex] = {
-      ...current,
-      category: input.category || current.category,
-      lat: input.lat ?? current.lat,
-      lng: input.lng ?? current.lng,
-      sourceType: input.sourceType ?? current.sourceType,
-      sourceLabel: input.sourceLabel ?? current.sourceLabel,
-      sourceUrl: input.sourceUrl ?? current.sourceUrl,
-      rating: nextRating,
-      reviewCount: nextReviews.length,
-      reviews: nextReviews,
-    };
-    return places[placeIndex];
-  }
-
-  const created: PrototypeCommunityPlace = {
-    id: Date.now(),
-    title: input.title.trim(),
-    category: input.category,
-    address: input.address.trim(),
-    rating,
-    reviewCount: review ? 1 : 0,
-    lat: input.lat ?? 37.5665,
-    lng: input.lng ?? 126.978,
-    reviews: review ? [review] : [],
-    sourceType: input.sourceType ?? 'manual',
-    sourceLabel: input.sourceLabel ?? '제보 등록',
-    sourceUrl: input.sourceUrl ?? null,
-  };
-
-  places.unshift(created);
-  return created;
 }
 
 export function getSession() {
@@ -436,10 +342,7 @@ export function getSession() {
   const legacyGroup = typeof window !== 'undefined' ? window.localStorage.getItem('dm_group_type') : null;
 
   if (!hasStoredSession && !current.onboardingComplete && (legacyMode || legacyGroup)) {
-    return createPrototypeSession(
-      legacyMode === 'google' ? 'google' : 'guest',
-      legacyGroup === 'friends' ? 'friends' : 'couple'
-    );
+    return createPrototypeSession(legacyMode === 'google' ? 'google' : 'guest', legacyGroup === 'friends' ? 'friends' : 'couple');
   }
 
   return current;
@@ -542,65 +445,85 @@ export function reopenWish(id: number) {
   saveWishlist(nextItems);
 }
 
-export function shareWishReviewToCommunity(item: PrototypeWish, session: PrototypeSession) {
-  if (!item.address || !item.review || !item.rating) return false;
-
-  const reviewType: ReviewType = session.groupType === 'friends' ? 'friends' : 'couple';
-  const author = resolveReviewAuthor(session);
+export function addCommunityPlace(input: AddCommunityPlaceInput, session?: PrototypeSession) {
   const places = getCommunityPlaces();
-  const existingIndex = places.findIndex((place) => place.title === item.title || place.address === item.address);
-  const review: PrototypeReview = {
-    id: Date.now(),
-    author,
-    text: item.review,
-    rating: item.rating,
-    reviewType,
-    createdAt: today(),
-  };
+  const reviewType = input.reviewType ?? (session?.groupType === 'friends' ? 'friends' : 'couple');
+  const author = session ? resolveReviewAuthor(session) : '가자고 제보';
+  const note = input.note?.trim();
+  const rating = input.rating ?? 4;
+  const existingIndex = places.findIndex(
+    (place) => place.title.trim() === input.title.trim() || place.address.trim() === input.address.trim()
+  );
+  const review = note ? createReview(author, note, rating, reviewType, today()) : null;
 
   if (existingIndex >= 0) {
-    const target = places[existingIndex];
-    const nextReviews = [review, ...target.reviews];
-    const nextRating = nextReviews.reduce((sum, entry) => sum + entry.rating, 0) / nextReviews.length;
+    const current = places[existingIndex];
+    const nextReviews = review ? [review, ...current.reviews] : current.reviews;
+    const nextRating = nextReviews.length
+      ? Number((nextReviews.reduce((sum, item) => sum + item.rating, 0) / nextReviews.length).toFixed(1))
+      : current.rating;
     places[existingIndex] = {
-      ...target,
-      rating: Number(nextRating.toFixed(1)),
+      ...current,
+      category: input.category || current.category,
+      lat: input.lat ?? current.lat,
+      lng: input.lng ?? current.lng,
+      sourceType: input.sourceType ?? current.sourceType,
+      sourceLabel: input.sourceLabel ?? current.sourceLabel,
+      sourceUrl: input.sourceUrl ?? current.sourceUrl,
+      rating: nextRating,
       reviewCount: nextReviews.length,
       reviews: nextReviews,
     };
     saveCommunityPlaces([...places]);
-  } else {
-    saveCommunityPlaces([
-      {
-        id: Date.now(),
-        title: item.title,
-        category: item.category,
-        address: item.address,
-        rating: item.rating,
-        reviewCount: 1,
-        lat: item.lat ?? 37.5665,
-        lng: item.lng ?? 126.978,
-        reviews: [review],
-        sourceType: item.sourceType ?? 'community',
-        sourceLabel: item.sourceLabel ?? '위시리스트 공유',
-        sourceUrl: item.sourceUrl ?? null,
-      },
-      ...places,
-    ]);
+    return places[existingIndex];
   }
 
+  const created: PrototypeCommunityPlace = {
+    id: Date.now(),
+    title: input.title.trim(),
+    category: input.category,
+    address: input.address.trim(),
+    rating,
+    reviewCount: review ? 1 : 0,
+    lat: input.lat ?? 37.5665,
+    lng: input.lng ?? 126.978,
+    reviews: review ? [review] : [],
+    sourceType: input.sourceType ?? 'manual',
+    sourceLabel: input.sourceLabel ?? '제보 등록',
+    sourceUrl: input.sourceUrl ?? null,
+  };
+  places.unshift(created);
+  saveCommunityPlaces([...places]);
+  return created;
+}
+
+export function shareWishReviewToCommunity(item: PrototypeWish, session: PrototypeSession) {
+  if (!item.address || !item.review || !item.rating) return false;
+
+  addCommunityPlace(
+    {
+      title: item.title,
+      category: item.category,
+      address: item.address,
+      rating: item.rating,
+      note: item.review,
+      lat: item.lat,
+      lng: item.lng,
+      reviewType: session.groupType === 'friends' ? 'friends' : 'couple',
+      sourceType: item.sourceType ?? 'community',
+      sourceLabel: item.sourceLabel ?? '위시리스트 공유',
+      sourceUrl: item.sourceUrl ?? null,
+    },
+    session
+  );
+
   saveWishlist(
-    getWishlist().map((wish) => (wish.id === item.id ? { ...wish, sharedToMap: true, reviewType } : wish))
+    getWishlist().map((wish) =>
+      wish.id === item.id ? { ...wish, sharedToMap: true, reviewType: session.groupType === 'friends' ? 'friends' : 'couple' } : wish
+    )
   );
 
   return true;
-}
-
-export function addCommunityPlace(input: AddCommunityPlaceInput, session?: PrototypeSession) {
-  const places = getCommunityPlaces();
-  const created = upsertCommunityPlace(places, input, session);
-  saveCommunityPlaces([...places]);
-  return created;
 }
 
 export function resetPrototypeData() {

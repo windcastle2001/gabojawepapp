@@ -8,7 +8,7 @@ interface KakaoMapProps {
   places: CommunityPlace[];
   onPlaceSelect: (place: CommunityPlace) => void;
   selectedId: number | null;
-  onLoadError?: () => void;
+  onLoadError?: (message: string) => void;
 }
 
 const CATEGORY_MARKERS: Record<string, string> = {
@@ -17,6 +17,19 @@ const CATEGORY_MARKERS: Record<string, string> = {
   산책: '6FA48B',
   액티비티: '5B8DEF',
 };
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (char) => {
+    const entities: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    };
+    return entities[char] ?? char;
+  });
+}
 
 function makeMarkerSvg(hexColor: string) {
   const color = hexColor.startsWith('#') ? hexColor : `#${hexColor}`;
@@ -32,7 +45,7 @@ function makeMarkerSvg(hexColor: string) {
 function ensureKakaoMapScript(appKey: string) {
   return new Promise<void>((resolve, reject) => {
     if (typeof window === 'undefined') {
-      reject(new Error('Window is unavailable.'));
+      reject(new Error('브라우저 환경에서만 지도를 불러올 수 있습니다.'));
       return;
     }
 
@@ -43,26 +56,24 @@ function ensureKakaoMapScript(appKey: string) {
 
     const existing = document.querySelector<HTMLScriptElement>('script[data-kakao-map-sdk="true"]');
     if (existing) {
-      if (window.kakao?.maps) {
-        window.kakao.maps.load(() => resolve());
-        return;
-      }
-      existing.remove();
+      existing.addEventListener('load', () => window.kakao?.maps?.load(() => resolve()), { once: true });
+      existing.addEventListener('error', () => reject(new Error('Kakao Maps SDK 로드에 실패했습니다.')), { once: true });
+      return;
     }
 
     const script = document.createElement('script');
     script.async = true;
     script.defer = true;
     script.dataset.kakaoMapSdk = 'true';
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false&libraries=services`;
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(appKey)}&autoload=false&libraries=services`;
     script.onload = () => {
       if (!window.kakao?.maps) {
-        reject(new Error('Kakao Maps SDK did not initialize.'));
+        reject(new Error('Kakao Maps SDK가 초기화되지 않았습니다.'));
         return;
       }
       window.kakao.maps.load(() => resolve());
     };
-    script.onerror = () => reject(new Error('Failed to load Kakao Maps SDK.'));
+    script.onerror = () => reject(new Error('Kakao Maps SDK 로드에 실패했습니다.'));
     document.head.appendChild(script);
   });
 }
@@ -70,27 +81,13 @@ function ensureKakaoMapScript(appKey: string) {
 async function getKakaoStatusMessage() {
   try {
     const response = await fetch('/api/kakao-map-status', { cache: 'no-store' });
-    const data = (await response.json()) as {
-      ok?: boolean;
-      reason?: string;
-      message?: string;
-    };
-
+    const data = (await response.json()) as { ok?: boolean; reason?: string; message?: string };
     if (data.ok) return null;
-
-    if (data.reason === 'NotAuthorizedError' && data.message?.includes('OPEN_MAP_AND_LOCAL')) {
-      return '카카오 Developers에서 OPEN_MAP_AND_LOCAL, 즉 Kakao Map 사용 설정이 아직 활성화되지 않았습니다.';
+    if (data.reason === 'missing_key') return 'NEXT_PUBLIC_KAKAO_MAP_KEY가 설정되지 않았습니다.';
+    if (data.reason === 'NotAuthorizedError') {
+      return '카카오 Developers의 JavaScript SDK 도메인에 현재 접속 주소가 등록되어 있는지 확인해 주세요.';
     }
-
-    if (data.reason === 'missing_key') {
-      return '앱에 NEXT_PUBLIC_KAKAO_MAP_KEY가 설정되지 않았습니다.';
-    }
-
-    if (data.message) {
-      return data.message;
-    }
-
-    return null;
+    return data.message ?? null;
   } catch {
     return null;
   }
@@ -118,19 +115,20 @@ export function KakaoMap({ appKey, places, onPlaceSelect, selectedId, onLoadErro
     ensureKakaoMapScript(appKey)
       .then(() => {
         if (disposed || !containerRef.current || !window.kakao?.maps) return;
-
         const { maps } = window.kakao;
-        const center = new maps.LatLng(37.5665, 126.978);
-        const map = new maps.Map(containerRef.current, { center, level: 6 });
+        const firstPlace = places[0];
+        const center = firstPlace ? new maps.LatLng(firstPlace.lat, firstPlace.lng) : new maps.LatLng(37.5665, 126.978);
+        const map = new maps.Map(containerRef.current, { center, level: firstPlace ? 5 : 7 });
         mapRef.current = map;
         setLoadError(null);
         setDiagnosticMessage(null);
       })
       .catch(async (error: Error) => {
         if (!disposed) {
+          const diagnostic = await getKakaoStatusMessage();
           setLoadError(error.message);
-          setDiagnosticMessage(await getKakaoStatusMessage());
-          onLoadError?.();
+          setDiagnosticMessage(diagnostic);
+          onLoadError?.(diagnostic ?? error.message);
         }
       });
 
@@ -153,14 +151,15 @@ export function KakaoMap({ appKey, places, onPlaceSelect, selectedId, onLoadErro
     infoWindowRef.current?.close();
     infoWindowRef.current = null;
 
+    const bounds = new maps.LatLngBounds();
     places.forEach((place) => {
+      const markerPosition = new maps.LatLng(place.lat, place.lng);
+      bounds.extend(markerPosition);
       const imageSrc = makeMarkerSvg(CATEGORY_MARKERS[place.category] ?? '7B6F68');
-      const imageSize = new maps.Size(40, 48);
-      const imageOption = { offset: new maps.Point(20, 44) };
-      const markerImage = new maps.MarkerImage(imageSrc, imageSize, imageOption);
+      const markerImage = new maps.MarkerImage(imageSrc, new maps.Size(40, 48), { offset: new maps.Point(20, 44) });
       const marker = new maps.Marker({
         map: mapRef.current,
-        position: new maps.LatLng(place.lat, place.lng),
+        position: markerPosition,
         title: place.title,
         image: markerImage,
       });
@@ -169,8 +168,8 @@ export function KakaoMap({ appKey, places, onPlaceSelect, selectedId, onLoadErro
         removable: false,
         content: `
           <div style="padding:10px 12px;min-width:180px;">
-            <div style="font-weight:700;font-size:13px;color:#2A2A2A;">${place.title}</div>
-            <div style="margin-top:4px;font-size:12px;color:#6B6B6B;">${place.category} · 평점 ${place.rating}</div>
+            <div style="font-weight:700;font-size:13px;color:#2B2521;">${escapeHtml(place.title)}</div>
+            <div style="margin-top:4px;font-size:12px;color:#7B6F68;">${escapeHtml(place.category)} · 평점 ${place.rating}</div>
           </div>
         `,
       });
@@ -184,6 +183,13 @@ export function KakaoMap({ appKey, places, onPlaceSelect, selectedId, onLoadErro
 
       markersRef.current.push(marker);
     });
+
+    if (places.length > 1) {
+      mapRef.current.setBounds(bounds);
+    } else if (places[0]) {
+      mapRef.current.setCenter(new maps.LatLng(places[0].lat, places[0].lng));
+      mapRef.current.setLevel(5);
+    }
   }, [onPlaceSelect, places]);
 
   useEffect(() => {
@@ -195,13 +201,13 @@ export function KakaoMap({ appKey, places, onPlaceSelect, selectedId, onLoadErro
   if (loadError) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-[hsl(var(--muted))] px-6 text-center">
-        <div className="max-w-md">
+        <div className="max-w-md rounded-3xl bg-background/95 p-5 shadow-sm">
           <p className="text-sm font-semibold text-foreground">카카오맵을 불러오지 못했습니다.</p>
           <p className="mt-2 text-xs text-muted-foreground">{loadError}</p>
           {diagnosticMessage ? <p className="mt-2 text-xs font-medium text-foreground">{diagnosticMessage}</p> : null}
           <div className="mt-3 space-y-1 text-[11px] text-muted-foreground">
             <p>현재 접속 주소: {currentOrigin || '확인 중'}</p>
-            <p>지금 확인된 원인상 도메인보다 카카오 앱의 사용 설정이 더 핵심 문제로 보입니다.</p>
+            <p>로컬은 `http://localhost:3002`, `http://127.0.0.1:3002`를 등록하고, Vercel 주소도 별도로 등록해야 합니다.</p>
           </div>
         </div>
       </div>
