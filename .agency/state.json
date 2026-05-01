@@ -1,28 +1,29 @@
 {
   "project": "가자고",
   "version": "0.1.0-prototype",
-  "last_updated": "2026-05-01T00:00:00Z",
-  "current_phase": "prototype_qa_phase",
+  "last_updated": "2026-05-01T14:30:00Z",
+  "current_phase": "prototype_feature_polish",
   "active_blockers": [],
   "completed_critical_fixes": [
     {
-      "blocker_id": "UX-STATE-1",
-      "description": "온보딩/커플 연결 상태를 connectedAt 기반으로 재정리하고, reset 시 legacy fallback으로 재진입하던 문제 수정",
-      "fixed_at": "2026-05-01T00:00:00Z"
+      "blocker_id": "MAP-2",
+      "description": "커뮤니티 맵에 내 주변 필터, 수동 제보, 카카오 장소 검색 결과 등록, 링크 기반 등록 진입 추가",
+      "fixed_at": "2026-05-01T14:30:00Z"
     },
     {
-      "blocker_id": "MAP-1",
-      "description": "카카오맵 SDK 실패 시 현재 origin과 대표 원인을 바로 확인할 수 있도록 오류 UI 개선",
-      "fixed_at": "2026-05-01T00:00:00Z"
+      "blocker_id": "WISH-2",
+      "description": "위시리스트 완료 팝업에서 커뮤니티 맵 공유를 바로 선택할 수 있게 하고, 저장 출처/공유 상태를 카드에 반영",
+      "fixed_at": "2026-05-01T14:30:00Z"
     },
     {
-      "blocker_id": "UX-CARET-1",
-      "description": "전역 caret/cursor 동작을 웹앱형으로 조정해 비포커스 상태에서 깜빡이는 caret 제거",
-      "fixed_at": "2026-05-01T00:00:00Z"
+      "blocker_id": "DATA-2",
+      "description": "prototype-store를 정리해 위시/커뮤니티 장소의 source metadata와 수동 커뮤니티 추가 helper를 추가",
+      "fixed_at": "2026-05-01T14:30:00Z"
     }
   ],
   "pending_warnings": [
-    "깨진 한글 문자열이 일부 화면(app/app/ai, app/app/map, app/app/wishlist)에 남아 있음",
-    "Next.js workspace root 경고는 상위 package-lock.json 때문에 계속 출력됨"
+    "일부 오래된 페이지와 문서 파일에 깨진 문자열이 남아 있다. 이번 턴에서 map/wishlist/store/capture는 정리했지만 ai page 등은 후속 정리가 필요하다.",
+    "Next.js workspace root 경고는 상위 package-lock.json 때문에 계속 출력된다.",
+    "tsconfig가 .next/types/**/*.ts 를 include 하고 있어 npx tsc 단독 실행은 환경에 따라 실패할 수 있다."
   ]
 }

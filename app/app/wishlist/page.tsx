@@ -1,37 +1,52 @@
 'use client';
-import { useState, useEffect } from 'react';
+
+import { useEffect, useMemo, useState } from 'react';
+import { Check, MapPinned, Plus, RotateCcw, Search, Share2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
+  addWishFromPlace,
+  completeWish,
   getSession,
   getWishlist,
-  saveWishlist,
+  reopenWish,
   shareWishReviewToCommunity,
   type GroupType,
   type PrototypeSession,
   type PrototypeWish,
 } from '@/lib/prototype-store';
 
-const CATEGORIES = ['전체', '음식', '카페', '장소', '선물', '여행', '액티비티', '기타'];
+const CATEGORIES = ['전체', '맛집', '카페', '산책', '액티비티', '기타'] as const;
 
 const CATEGORY_EMOJI: Record<string, string> = {
-  카페: '☕', 음식: '🍽️', 장소: '📍', 선물: '🎁',
-  여행: '✈️', 액티비티: '🏃', 기타: '📌',
+  맛집: '🍽️',
+  카페: '☕',
+  산책: '🚶',
+  액티비티: '🎯',
+  기타: '📌',
 };
 
-/* ───── 별점 컴포넌트 ───── */
-function StarRating({ value, onChange }: { value: number; onChange?: (v: number) => void }) {
+const SOURCE_LABEL_STYLES: Record<string, string> = {
+  community: 'bg-secondary/10 text-secondary',
+  kakao_search: 'bg-warning/15 text-[#7A4A10]',
+  shared_link: 'bg-brand/10 text-brand',
+  manual: 'bg-muted text-muted-foreground',
+};
+
+function StarInput({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+}) {
   return (
-    <div className="flex gap-1" aria-label={`별점 ${value}점`}>
+    <div className="flex gap-1">
       {[1, 2, 3, 4, 5].map((star) => (
         <button
           key={star}
           type="button"
-          onClick={() => onChange?.(star)}
-          className={cn(
-            'text-xl leading-none transition-transform',
-            onChange ? 'cursor-pointer hover:scale-110' : 'cursor-default',
-            star <= value ? 'text-yellow-400' : 'text-gray-200'
-          )}
+          onClick={() => onChange(star)}
+          className={cn('text-2xl transition-transform hover:scale-110', star <= value ? 'text-yellow-400' : 'text-gray-200')}
           aria-label={`${star}점`}
         >
           ★
@@ -41,614 +56,498 @@ function StarRating({ value, onChange }: { value: number; onChange?: (v: number)
   );
 }
 
-/* ───── WishCard 컴포넌트 ───── */
-interface WishCardProps {
+function ReviewModal({
+  item,
+  groupType,
+  onClose,
+  onSave,
+}: {
   item: PrototypeWish;
-  onComplete: (id: number) => void;
-  onUncomplete: (id: number) => void;
-  onShareToMap: (item: PrototypeWish) => void;
   groupType: GroupType;
-}
-
-function WishCard({ item, onComplete, onUncomplete, onShareToMap, groupType }: WishCardProps) {
-  const isCouple = groupType === 'couple';
-  const emoji = CATEGORY_EMOJI[item.category] ?? '📌';
+  onClose: () => void;
+  onSave: (rating: number, review: string, shareToCommunity: boolean) => void;
+}) {
+  const [rating, setRating] = useState(5);
+  const [review, setReview] = useState(item.review ?? '');
+  const [shareToCommunity, setShareToCommunity] = useState(Boolean(item.address));
 
   return (
-    <div
-      className={cn(
-        'bg-white rounded-2xl border px-4 py-3 shadow-sm',
-        item.completed ? 'border-gray-100 opacity-80' : 'border-[#F0E8EC]'
-      )}
-    >
-      <div className="flex items-start gap-3">
-        {/* 아이콘 */}
-        <div
-          className={cn(
-            'w-10 h-10 rounded-xl flex items-center justify-center text-xl shrink-0',
-            item.completed ? 'bg-gray-100' : 'bg-[#FFE4EF]'
-          )}
-          aria-hidden
-        >
-          {emoji}
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 md:items-center">
+      <div className="w-full max-w-lg rounded-t-3xl bg-background p-6 shadow-2xl md:rounded-3xl">
+        <div className="mb-5 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-foreground">완료하고 후기 남기기</h2>
+            <p className="mt-1 text-xs text-muted-foreground">{item.title}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground"
+            aria-label="닫기"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
-        {/* 내용 */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-            <span
-              className={cn(
-                'text-[10px] font-semibold px-2 py-0.5 rounded-full',
-                item.completed
-                  ? 'bg-gray-100 text-gray-500'
-                  : 'bg-[#FFE4EF] text-[#FF6B9D]'
-              )}
-            >
-              {item.category}
-            </span>
-            <span className="text-[10px] text-[#888]">
-              {item.addedBy === 'me'
-                ? '🩷 나'
-                : item.addedBy === 'member'
-                  ? '👥 멤버'
-                  : isCouple
-                  ? '💙 파트너'
-                  : '👥 멤버'}
-            </span>
-            {item.type === 'activity' && (
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FEF0E6] text-[#FB923C]">
-                활동
-              </span>
-            )}
+        <div className="space-y-4">
+          <div>
+            <p className="mb-2 text-xs font-semibold text-muted-foreground">평점</p>
+            <StarInput value={rating} onChange={setRating} />
           </div>
 
-          <p
-            className={cn(
-              'text-sm font-semibold truncate',
-              item.completed ? 'line-through text-gray-400' : 'text-[#2A2A2A]'
-            )}
+          <div>
+            <label className="mb-2 block text-xs font-semibold text-muted-foreground" htmlFor="wish-review">
+              후기
+            </label>
+            <textarea
+              id="wish-review"
+              rows={4}
+              value={review}
+              onChange={(event) => setReview(event.target.value)}
+              placeholder="분위기, 대화하기 좋았는지, 다음에 또 가고 싶은지 적어보세요."
+              className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none focus:border-brand"
+            />
+          </div>
+
+          {item.address ? (
+            <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-border bg-card px-4 py-3">
+              <input
+                type="checkbox"
+                checked={shareToCommunity}
+                onChange={(event) => setShareToCommunity(event.target.checked)}
+                className="mt-1"
+              />
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  {groupType === 'couple' ? '커플 리뷰로 커뮤니티 맵에 공유' : '친구 리뷰로 커뮤니티 맵에 공유'}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  완료 저장과 함께 다른 사용자도 볼 수 있는 맵 리뷰로 올립니다.
+                </p>
+              </div>
+            </label>
+          ) : null}
+
+          <button
+            onClick={() => onSave(rating, review, shareToCommunity)}
+            className="w-full rounded-2xl bg-brand py-3 text-sm font-semibold text-brand-foreground shadow-md shadow-brand/25"
           >
+            완료 저장
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AddWishModal({
+  onClose,
+  onAdd,
+}: {
+  onClose: () => void;
+  onAdd: (payload: { title: string; category: string; address: string | null; tags: string[] }) => void;
+}) {
+  const [title, setTitle] = useState('');
+  const [category, setCategory] = useState('카페');
+  const [address, setAddress] = useState('');
+  const [tags, setTags] = useState('');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 md:items-center">
+      <div className="w-full max-w-lg rounded-t-3xl bg-background p-6 shadow-2xl md:rounded-3xl">
+        <div className="mb-5 flex items-center justify-between">
+          <h2 className="text-base font-bold text-foreground">위시리스트에 직접 추가</h2>
+          <button
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground"
+            aria-label="닫기"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="mb-2 block text-xs font-semibold text-muted-foreground">이름</label>
+            <input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none focus:border-brand"
+              placeholder="예: 성수 루프탑 카페"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-xs font-semibold text-muted-foreground">카테고리</label>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORIES.filter((item) => item !== '전체').map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  onClick={() => setCategory(item)}
+                  className={cn(
+                    'rounded-full border px-3 py-1.5 text-xs font-semibold',
+                    category === item ? 'border-brand bg-brand text-brand-foreground' : 'border-border bg-card text-muted-foreground'
+                  )}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-xs font-semibold text-muted-foreground">주소</label>
+            <input
+              value={address}
+              onChange={(event) => setAddress(event.target.value)}
+              className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none focus:border-brand"
+              placeholder="주소가 없으면 비워도 괜찮아요."
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-xs font-semibold text-muted-foreground">태그</label>
+            <input
+              value={tags}
+              onChange={(event) => setTags(event.target.value)}
+              className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-foreground outline-none focus:border-brand"
+              placeholder="분위기, 재방문 같은 식으로 쉼표로 구분"
+            />
+          </div>
+
+          <button
+            onClick={() => {
+              if (!title.trim()) return;
+              onAdd({
+                title: title.trim(),
+                category,
+                address: address.trim() || null,
+                tags: tags
+                  .split(',')
+                  .map((item) => item.trim())
+                  .filter(Boolean),
+              });
+              onClose();
+            }}
+            className="w-full rounded-2xl bg-brand py-3 text-sm font-semibold text-brand-foreground shadow-md shadow-brand/25"
+          >
+            저장
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WishCard({
+  item,
+  groupType,
+  onCompleteClick,
+  onReopen,
+  onShareToMap,
+}: {
+  item: PrototypeWish;
+  groupType: GroupType;
+  onCompleteClick: (item: PrototypeWish) => void;
+  onReopen: (id: number) => void;
+  onShareToMap: (item: PrototypeWish) => void;
+}) {
+  const categoryEmoji = CATEGORY_EMOJI[item.category] ?? '📍';
+  const sourceClass = SOURCE_LABEL_STYLES[item.sourceType ?? 'manual'] ?? SOURCE_LABEL_STYLES.manual;
+
+  return (
+    <div className="rounded-3xl border border-border bg-card px-4 py-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-xl', item.completed ? 'bg-muted' : 'bg-brand/10')}>
+          {categoryEmoji}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex flex-wrap items-center gap-1.5">
+            <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold text-brand">{item.category}</span>
+            {item.sourceLabel ? (
+              <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', sourceClass)}>{item.sourceLabel}</span>
+            ) : null}
+            {item.sharedToMap ? (
+              <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">맵 공유됨</span>
+            ) : null}
+          </div>
+
+          <p className={cn('text-sm font-semibold text-foreground', item.completed && 'text-muted-foreground line-through')}>
             {item.title}
           </p>
+          {item.address ? <p className="mt-1 text-xs text-muted-foreground">{item.address}</p> : null}
 
-          {item.address && (
-            <p className="text-xs text-[#BBB] truncate mt-0.5">📍 {item.address}</p>
-          )}
+          <div className="mt-1 flex flex-wrap gap-1 text-[10px] text-muted-foreground">
+            <span>{item.addedBy === 'me' ? '내가 저장' : item.addedBy === 'partner' ? '파트너 저장' : '멤버 저장'}</span>
+            <span>·</span>
+            <span>{item.addedAt}</span>
+          </div>
 
-          <p className="text-[10px] text-[#BBB] mt-0.5">{item.addedAt} 추가</p>
-
-          {/* 완료 탭: 리뷰 & 별점 */}
-          {item.completed && item.review && (
-            <div className="mt-2 bg-gray-50 rounded-xl p-2.5">
-              <StarRating value={item.rating ?? 0} />
-              <p className="text-xs text-[#888] mt-1">{item.review}</p>
-              {item.address && (
-                <button
-                  onClick={() => onShareToMap(item)}
-                  disabled={item.sharedToMap}
-                  className={cn(
-                    'mt-2 w-full rounded-lg px-3 py-2 text-xs font-semibold transition-colors',
-                    item.sharedToMap
-                      ? 'bg-gray-100 text-gray-400'
-                      : isCouple
-                        ? 'bg-brand/10 text-brand hover:bg-brand/20'
-                        : 'bg-secondary/10 text-secondary hover:bg-secondary/20'
-                  )}
-                  aria-label="커뮤니티 맵에 리뷰 공유"
-                >
-                  {item.sharedToMap
-                    ? '커뮤니티 맵에 공유됨'
-                    : `${isCouple ? '💑 커플 리뷰' : '👥 친구 리뷰'}로 맵에 공유`}
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* 태그 */}
-          {item.tags.length > 0 && (
-            <div className="flex gap-1 flex-wrap mt-1.5">
+          {item.tags.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-1">
               {item.tags.map((tag) => (
-                <span key={tag} className="text-[10px] text-[#888] bg-[#FFF8FA] px-2 py-0.5 rounded-full border border-[#F0E8EC]">
+                <span key={tag} className="rounded-full border border-border bg-background px-2 py-0.5 text-[10px] text-muted-foreground">
                   #{tag}
                 </span>
               ))}
             </div>
-          )}
+          ) : null}
+
+          {item.completed && item.review ? (
+            <div className="mt-3 rounded-2xl bg-background px-3 py-3">
+              <div className="mb-1 flex items-center gap-1 text-yellow-400">
+                {'★'.repeat(item.rating ?? 0)}
+                <span className="ml-1 text-xs text-foreground">{item.rating}점</span>
+              </div>
+              <p className="text-xs leading-5 text-muted-foreground">{item.review}</p>
+              {item.address ? (
+                <button
+                  onClick={() => onShareToMap(item)}
+                  disabled={item.sharedToMap}
+                  className={cn(
+                    'mt-3 inline-flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-semibold',
+                    item.sharedToMap
+                      ? 'bg-muted text-muted-foreground'
+                      : groupType === 'couple'
+                        ? 'bg-brand/10 text-brand'
+                        : 'bg-secondary/10 text-secondary'
+                  )}
+                >
+                  <MapPinned className="h-3.5 w-3.5" />
+                  {item.sharedToMap ? '커뮤니티 맵에 공유됨' : '커뮤니티 맵에 공유하기'}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
-        {/* 액션 버튼 */}
-        <div className="flex flex-col gap-1 shrink-0">
+        <div className="flex shrink-0 flex-col gap-2">
           {item.completed ? (
             <button
-              onClick={() => onUncomplete(item.id)}
-              className="text-xs text-[#888] bg-gray-100 rounded-lg px-2 py-1.5 hover:bg-gray-200 transition-colors whitespace-nowrap"
-              aria-label="다시 위시리스트로 되돌리기"
+              onClick={() => onReopen(item.id)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground"
+              aria-label="다시 위시로 돌리기"
             >
-              ↩️ 다시
+              <RotateCcw className="h-4 w-4" />
             </button>
           ) : (
-            <>
-              <button
-                onClick={() => onComplete(item.id)}
-                className="w-8 h-8 rounded-xl bg-[#FFE4EF] flex items-center justify-center text-[#FF6B9D] hover:bg-[#FF6B9D] hover:text-white transition-colors"
-                aria-label="완료로 표시"
-              >
-                ✓
-              </button>
-              <button
-                className="w-8 h-8 rounded-xl bg-[#E3F3FF] flex items-center justify-center text-[#5BB8F5] hover:bg-[#5BB8F5] hover:text-white transition-colors"
-                aria-label="공유하기"
-              >
-                📤
-              </button>
-            </>
+            <button
+              onClick={() => onCompleteClick(item)}
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10 text-brand"
+              aria-label="완료로 표시"
+            >
+              <Check className="h-4 w-4" />
+            </button>
           )}
+          {item.sourceUrl ? (
+            <a
+              href={item.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-secondary/10 text-secondary"
+              aria-label="원본 링크 열기"
+            >
+              <Share2 className="h-4 w-4" />
+            </a>
+          ) : null}
         </div>
       </div>
     </div>
   );
 }
 
-/* ───── AddModal ───── */
-interface AddModalProps {
-  onClose: () => void;
-  onAdd: (item: Omit<PrototypeWish, 'id' | 'completed' | 'completedAt' | 'review' | 'rating'>) => void;
-}
-
-function AddModal({ onClose, onAdd }: AddModalProps) {
-  const [type, setType] = useState<'place' | 'activity'>('place');
-  const [title, setTitle] = useState('');
-  const [address, setAddress] = useState('');
-  const [category, setCategory] = useState('카페');
-  const [tags, setTags] = useState('');
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!title.trim()) return;
-    onAdd({
-      title: title.trim(),
-      type,
-      category,
-      address: address.trim() || null,
-      addedBy: 'me',
-      addedAt: new Date().toISOString().split('T')[0],
-      tags: tags.split(',').map((t) => t.trim()).filter(Boolean),
-    });
-    onClose();
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end md:items-center justify-center"
-      role="dialog"
-      aria-modal="true"
-      aria-label="위시리스트 추가"
-    >
-      {/* 오버레이 */}
-      <div
-        className="absolute inset-0 bg-black/40"
-        onClick={onClose}
-        aria-hidden
-      />
-
-      {/* 모달 */}
-      <div className="relative bg-white w-full max-w-lg rounded-t-3xl md:rounded-3xl p-6 animate-slide-up-sheet">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-bold text-[#2A2A2A]">위시리스트에 추가</h2>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200"
-            aria-label="모달 닫기"
-          >
-            ✕
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* 타입 선택 */}
-          <div className="flex gap-2">
-            {(['place', 'activity'] as const).map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setType(t)}
-                className={cn(
-                  'flex-1 py-2.5 rounded-xl text-sm font-semibold border transition-colors',
-                  type === t
-                    ? 'bg-[#FF6B9D] text-white border-[#FF6B9D]'
-                    : 'bg-white text-[#888] border-[#F0E8EC]'
-                )}
-                aria-pressed={type === t}
-              >
-                {t === 'place' ? '📍 장소' : '🏃 활동'}
-              </button>
-            ))}
-          </div>
-
-          {/* 제목 */}
-          <div>
-            <label className="text-xs font-semibold text-[#888] mb-1 block" htmlFor="wish-title">
-              이름 *
-            </label>
-            <input
-              id="wish-title"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="예: 오르에르 성수"
-              required
-              className="w-full px-4 py-3 rounded-xl border border-[#F0E8EC] text-sm outline-none focus:border-[#FF6B9D] transition-colors"
-            />
-          </div>
-
-          {/* 주소 */}
-          {type === 'place' && (
-            <div>
-              <label className="text-xs font-semibold text-[#888] mb-1 block" htmlFor="wish-address">
-                주소
-              </label>
-              <input
-                id="wish-address"
-                type="text"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="예: 서울 성동구 성수이로"
-                className="w-full px-4 py-3 rounded-xl border border-[#F0E8EC] text-sm outline-none focus:border-[#FF6B9D] transition-colors"
-              />
-            </div>
-          )}
-
-          {/* 카테고리 */}
-          <div>
-            <label className="text-xs font-semibold text-[#888] mb-1 block">카테고리</label>
-            <div className="flex gap-2 flex-wrap">
-              {CATEGORIES.filter((c) => c !== '전체').map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setCategory(cat)}
-                  className={cn(
-                    'text-xs px-3 py-1.5 rounded-full border font-medium transition-colors',
-                    category === cat
-                      ? 'bg-[#FF6B9D] text-white border-[#FF6B9D]'
-                      : 'bg-white text-[#888] border-[#F0E8EC]'
-                  )}
-                  aria-pressed={category === cat}
-                >
-                  {CATEGORY_EMOJI[cat]} {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 태그 */}
-          <div>
-            <label className="text-xs font-semibold text-[#888] mb-1 block" htmlFor="wish-tags">
-              태그 (쉼표로 구분)
-            </label>
-            <input
-              id="wish-tags"
-              type="text"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder="예: 분위기, 인스타"
-              className="w-full px-4 py-3 rounded-xl border border-[#F0E8EC] text-sm outline-none focus:border-[#FF6B9D] transition-colors"
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-4 bg-[#FF6B9D] text-white font-bold rounded-2xl text-sm shadow-lg shadow-[#FF6B9D]/30 active:scale-[0.98] transition-transform"
-            aria-label="위시리스트에 추가하기"
-          >
-            💝 위시리스트에 추가
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-/* ───── ReviewModal ───── */
-interface ReviewModalProps {
-  item: PrototypeWish;
-  onClose: () => void;
-  onSave: (id: number, rating: number, review: string) => void;
-}
-
-function ReviewModal({ item, onClose, onSave }: ReviewModalProps) {
-  const [rating, setRating] = useState(5);
-  const [review, setReview] = useState('');
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    onSave(item.id, rating, review);
-    onClose();
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end md:items-center justify-center"
-      role="dialog"
-      aria-modal="true"
-      aria-label="방문 후기 작성"
-    >
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden />
-      <div className="relative bg-white w-full max-w-lg rounded-t-3xl md:rounded-3xl p-6 animate-slide-up-sheet">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-bold text-[#2A2A2A]">후기 남기기</h2>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500"
-            aria-label="모달 닫기"
-          >
-            ✕
-          </button>
-        </div>
-
-        <p className="text-sm font-semibold text-[#2A2A2A] mb-4">
-          {item.title}에 다녀오셨군요! 💕
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="text-xs font-semibold text-[#888] mb-2 block">별점</label>
-            <StarRating value={rating} onChange={setRating} />
-          </div>
-
-          <div>
-            <label className="text-xs font-semibold text-[#888] mb-1 block" htmlFor="review-text">
-              후기
-            </label>
-            <textarea
-              id="review-text"
-              value={review}
-              onChange={(e) => setReview(e.target.value)}
-              placeholder="어떠셨나요? 솔직한 후기를 남겨보세요 😊"
-              rows={3}
-              className="w-full px-4 py-3 rounded-xl border border-[#F0E8EC] text-sm outline-none resize-none focus:border-[#FF6B9D] transition-colors"
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-4 bg-[#FF6B9D] text-white font-bold rounded-2xl text-sm shadow-lg shadow-[#FF6B9D]/30"
-            aria-label="후기 저장하기"
-          >
-            후기 저장하기
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-/* ───── 메인 페이지 ───── */
 export default function WishlistPage() {
-  const [activeTab, setActiveTab] = useState<'wish' | 'done'>('wish');
-  const [activeCategory, setActiveCategory] = useState('전체');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [session, setSession] = useState<PrototypeSession | null>(null);
+  const [groupType, setGroupType] = useState<GroupType>('couple');
   const [items, setItems] = useState<PrototypeWish[]>([]);
+  const [activeTab, setActiveTab] = useState<'wish' | 'done'>('wish');
+  const [activeCategory, setActiveCategory] = useState<string>('전체');
+  const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<PrototypeWish | null>(null);
-  const [groupType, setGroupType] = useState<GroupType>('couple');
-  const [session, setSession] = useState<PrototypeSession | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
-    const nextSession = getSession();
-    setSession(nextSession);
-    setGroupType(nextSession.groupType ?? 'couple');
-    setItems(getWishlist());
-
     const sync = () => {
-      const synced = getSession();
-      setSession(synced);
-      setGroupType(synced.groupType ?? 'couple');
+      const nextSession = getSession();
+      setSession(nextSession);
+      setGroupType(nextSession.groupType ?? 'couple');
       setItems(getWishlist());
     };
+
+    sync();
     window.addEventListener('dm-store-change', sync);
     return () => window.removeEventListener('dm-store-change', sync);
   }, []);
 
-  function persist(nextItems: PrototypeWish[]) {
-    setItems(nextItems);
-    saveWishlist(nextItems);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  const filteredItems = useMemo(() => {
+    const source = activeTab === 'wish' ? items.filter((item) => !item.completed) : items.filter((item) => item.completed);
+    return source.filter((item) => {
+      const matchesCategory = activeCategory === '전체' || item.category === activeCategory;
+      const query = searchQuery.trim().toLowerCase();
+      const matchesQuery =
+        !query ||
+        item.title.toLowerCase().includes(query) ||
+        item.address?.toLowerCase().includes(query) ||
+        item.sourceLabel?.toLowerCase().includes(query);
+      return matchesCategory && matchesQuery;
+    });
+  }, [activeCategory, activeTab, items, searchQuery]);
+
+  const pendingCount = items.filter((item) => !item.completed).length;
+  const doneCount = items.filter((item) => item.completed).length;
+
+  function refreshWishlist() {
+    setItems(getWishlist());
   }
 
-  const wishItems = items.filter((i) => !i.completed);
-  const doneItems = items.filter((i) => i.completed);
-
-  const displayItems = (activeTab === 'wish' ? wishItems : doneItems).filter((item) => {
-    const matchCat = activeCategory === '전체' || item.category === activeCategory;
-    const matchSearch =
-      !searchQuery ||
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.address?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchCat && matchSearch;
-  });
-
-  function handleComplete(id: number) {
-    const target = items.find((i) => i.id === id);
-    if (target) setReviewTarget(target);
+  function handleAddManualWish(payload: { title: string; category: string; address: string | null; tags: string[] }) {
+    const added = addWishFromPlace({
+      ...payload,
+      sourceType: 'manual',
+      sourceLabel: '직접 저장',
+      sourceUrl: null,
+      type: payload.address ? 'place' : 'activity',
+    });
+    if (added) {
+      refreshWishlist();
+      setToast('위시리스트에 추가했어요.');
+    }
   }
 
-  function handleUncomplete(id: number) {
-    persist(
-      items.map((i) =>
-        i.id === id
-          ? { ...i, completed: false, completedAt: null, review: null, rating: null }
-          : i
-      )
-    );
+  function handleCompleteSave(rating: number, review: string, shareToCommunity: boolean) {
+    if (!reviewTarget || !session) return;
+    const completed = completeWish(reviewTarget.id, rating, review);
+    refreshWishlist();
+    if (completed && shareToCommunity) {
+      const shared = shareWishReviewToCommunity(completed, session);
+      refreshWishlist();
+      setToast(shared ? '완료 후기를 커뮤니티 맵에 같이 공유했어요.' : '완료 저장은 됐지만 맵 공유에는 주소와 후기가 더 필요해요.');
+    } else {
+      setToast('완료 목록으로 옮겼어요.');
+    }
+    setReviewTarget(null);
+    setActiveTab('done');
   }
 
-  function handleReviewSave(id: number, rating: number, review: string) {
-    persist(
-      items.map((i) =>
-        i.id === id
-          ? {
-              ...i,
-              completed: true,
-              completedAt: new Date().toISOString().split('T')[0],
-              review,
-              rating,
-            }
-          : i
-      )
-    );
-  }
-
-  function handleAddItem(
-    item: Omit<PrototypeWish, 'id' | 'completed' | 'completedAt' | 'review' | 'rating'>
-  ) {
-    persist([
-      {
-        ...item,
-        id: Date.now(),
-        completed: false,
-        completedAt: null,
-        review: null,
-        rating: null,
-      },
-      ...items,
-    ]);
+  function handleReopen(id: number) {
+    reopenWish(id);
+    refreshWishlist();
+    setToast('다시 위시리스트로 돌렸어요.');
+    setActiveTab('wish');
   }
 
   function handleShareToMap(item: PrototypeWish) {
     if (!session) return;
     const ok = shareWishReviewToCommunity(item, session);
-    setItems(getWishlist());
-    setToast(ok ? '커뮤니티 맵에 리뷰가 공유됐어요.' : '주소와 후기가 있어야 맵에 공유할 수 있어요.');
-    window.setTimeout(() => setToast(null), 2200);
+    refreshWishlist();
+    setToast(ok ? '커뮤니티 맵에 공유했어요.' : '주소와 후기가 있어야 커뮤니티 맵에 공유할 수 있어요.');
   }
 
   return (
-    <div className="min-h-screen bg-[#FFF8FA]">
-      {/* 헤더 */}
-      <header className="bg-white px-5 pt-12 pb-0 sticky top-0 z-20 border-b border-[#F0E8EC] shadow-sm">
-        <div className="max-w-2xl mx-auto">
-          <h1 className="text-xl font-black text-[#2A2A2A] mb-3">위시리스트</h1>
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-20 border-b border-border bg-card px-5 pb-4 pt-12 shadow-sm">
+        <div className="mx-auto max-w-2xl">
+          <h1 className="text-xl font-black text-foreground">위시리스트</h1>
+          <p className="mt-1 text-xs text-muted-foreground">지도, 검색, 공유 링크에서 저장한 장소까지 한 번에 관리합니다.</p>
 
-          {/* 탭 */}
-          <div className="flex border-b border-[#F0E8EC]">
-            {([
-              { id: 'wish', label: `위시리스트 ${wishItems.length}` },
-              { id: 'done', label: `${groupType === 'couple' ? '💑 우리' : '👥 모임'} 완료 ${doneItems.length}` },
-            ] as const).map(({ id, label }) => (
+          <div className="mt-4 flex gap-2">
+            {[
+              { key: 'wish', label: `위시 ${pendingCount}` },
+              { key: 'done', label: `완료 ${doneCount}` },
+            ].map((tab) => (
               <button
-                key={id}
-                onClick={() => setActiveTab(id)}
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key as 'wish' | 'done')}
                 className={cn(
-                  'flex-1 py-3 text-sm font-semibold border-b-2 transition-colors',
-                  activeTab === id
-                    ? 'text-[#FF6B9D] border-[#FF6B9D]'
-                    : 'text-[#BBB] border-transparent'
+                  'rounded-full px-4 py-2 text-sm font-semibold',
+                  activeTab === tab.key ? 'bg-brand text-brand-foreground' : 'bg-background text-muted-foreground border border-border'
                 )}
-                aria-selected={activeTab === id}
               >
-                {label}
+                {tab.label}
               </button>
             ))}
           </div>
         </div>
       </header>
 
-      {/* 검색 + 필터 */}
-      <div className="bg-white px-5 pt-3 pb-3 border-b border-[#F0E8EC] max-w-2xl mx-auto">
-        {/* 검색바 */}
-        <div className="flex items-center gap-2 bg-[#FFF8FA] rounded-xl border border-[#F0E8EC] px-3 py-2.5 mb-3">
-          <span className="text-[#BBB] text-sm" aria-hidden>🔍</span>
+      <div className="mx-auto max-w-2xl px-5 py-4">
+        <div className="mb-3 flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm">
+          <Search className="h-4 w-4 text-muted-foreground" />
           <input
             type="search"
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="장소 검색"
-            className="flex-1 text-sm bg-transparent outline-none text-[#2A2A2A] placeholder:text-[#BBB]"
-            aria-label="위시리스트 검색"
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="장소, 주소, 저장 경로로 검색"
+            className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground"
           />
         </div>
 
-        {/* 카테고리 필터 */}
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          {CATEGORIES.map((cat) => (
+        <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+          {CATEGORIES.map((category) => (
             <button
-              key={cat}
-              onClick={() => setActiveCategory(cat)}
+              key={category}
+              onClick={() => setActiveCategory(category)}
               className={cn(
-                'shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors border',
-                activeCategory === cat
-                  ? 'bg-[#FF6B9D] text-white border-[#FF6B9D]'
-                  : 'bg-white text-[#888] border-[#F0E8EC] hover:border-[#FF6B9D] hover:text-[#FF6B9D]'
+                'shrink-0 rounded-full border px-4 py-2 text-xs font-semibold',
+                activeCategory === category ? 'border-brand bg-brand text-brand-foreground' : 'border-border bg-card text-muted-foreground'
               )}
-              aria-pressed={activeCategory === cat}
             >
-              {cat === '전체' ? '전체' : `${CATEGORY_EMOJI[cat] ?? ''} ${cat}`}
+              {category === '전체' ? '전체' : `${CATEGORY_EMOJI[category] ?? '📍'} ${category}`}
             </button>
           ))}
         </div>
+
+        <div className="space-y-3">
+          {filteredItems.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-border bg-card px-6 py-12 text-center">
+              <p className="text-sm font-semibold text-foreground">
+                {activeTab === 'wish' ? '아직 위시리스트가 비어 있어요.' : '완료한 장소가 아직 없어요.'}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {activeTab === 'wish' ? '지도에서 추가하거나 직접 저장해보세요.' : '위시를 완료 처리하면 여기에 모입니다.'}
+              </p>
+            </div>
+          ) : (
+            filteredItems.map((item) => (
+              <WishCard
+                key={item.id}
+                item={item}
+                groupType={groupType}
+                onCompleteClick={setReviewTarget}
+                onReopen={handleReopen}
+                onShareToMap={handleShareToMap}
+              />
+            ))
+          )}
+        </div>
       </div>
 
-      {/* 리스트 */}
-      <div className="px-5 py-4 space-y-3 max-w-2xl mx-auto">
-        {displayItems.length === 0 ? (
-          <div className="text-center py-20">
-            <p className="text-5xl mb-3" aria-hidden>
-              {activeTab === 'wish' ? '💝' : '✅'}
-            </p>
-            <p className="text-sm font-semibold text-[#888]">
-              {activeTab === 'wish' ? '아직 위시리스트가 비어있어요' : '아직 완료된 장소가 없어요'}
-            </p>
-            <p className="text-xs text-[#BBB] mt-1">
-              {activeTab === 'wish' ? '+ 버튼을 눌러 추가해보세요!' : '위시리스트에서 완료 표시를 해보세요!'}
-            </p>
-          </div>
-        ) : (
-          displayItems.map((item) => (
-            <WishCard
-              key={item.id}
-              item={item}
-              onComplete={handleComplete}
-              onUncomplete={handleUncomplete}
-              onShareToMap={handleShareToMap}
-              groupType={groupType}
-            />
-          ))
-        )}
-      </div>
-
-      {/* FAB 버튼 */}
       <button
         onClick={() => setShowAddModal(true)}
-        className="fixed bottom-24 right-5 md:bottom-6 w-14 h-14 bg-[#FF6B9D] text-white text-2xl rounded-full shadow-lg shadow-[#FF6B9D]/40 flex items-center justify-center z-30 active:scale-90 transition-transform hover:bg-[#e85a8c]"
-        aria-label="위시리스트에 새 항목 추가"
+        className="fixed bottom-24 right-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg shadow-brand/35 md:bottom-6"
+        aria-label="직접 추가"
       >
-        +
+        <Plus className="h-6 w-6" />
       </button>
 
-      {/* AddModal */}
-      {showAddModal && (
-        <AddModal onClose={() => setShowAddModal(false)} onAdd={handleAddItem} />
-      )}
+      {showAddModal ? <AddWishModal onClose={() => setShowAddModal(false)} onAdd={handleAddManualWish} /> : null}
+      {reviewTarget ? (
+        <ReviewModal item={reviewTarget} groupType={groupType} onClose={() => setReviewTarget(null)} onSave={handleCompleteSave} />
+      ) : null}
 
-      {/* ReviewModal */}
-      {reviewTarget && (
-        <ReviewModal
-          item={reviewTarget}
-          onClose={() => setReviewTarget(null)}
-          onSave={handleReviewSave}
-        />
-      )}
-
-      {toast && (
-        <div
-          className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-foreground px-4 py-2.5 text-xs font-medium text-background shadow-lg"
-          role="status"
-          aria-live="polite"
-        >
+      {toast ? (
+        <div className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-foreground px-4 py-2.5 text-xs font-medium text-background shadow-lg">
           {toast}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -3,39 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CommunityPlace } from './types';
 
-declare global {
-  interface Window {
-    kakao?: {
-      maps: {
-        LatLng: new (lat: number, lng: number) => unknown;
-        Size: new (width: number, height: number) => unknown;
-        Point: new (x: number, y: number) => unknown;
-        MarkerImage: new (src: string, size: unknown, options?: { offset?: unknown }) => unknown;
-        Marker: new (options: { map: unknown; position: unknown; title?: string; image?: unknown }) => {
-          setMap: (map: unknown | null) => void;
-        };
-        InfoWindow: new (options: { content: string; removable?: boolean }) => {
-          open: (map: unknown, marker: unknown) => void;
-          close: () => void;
-        };
-        Map: new (container: HTMLElement, options: { center: unknown; level: number }) => {
-          setCenter: (latLng: unknown) => void;
-          setLevel: (level: number) => void;
-        };
-        event: {
-          addListener: (target: unknown, eventName: string, handler: () => void) => void;
-        };
-        load: (callback: () => void) => void;
-      };
-    };
-  }
-}
-
 interface KakaoMapProps {
   appKey: string;
   places: CommunityPlace[];
   onPlaceSelect: (place: CommunityPlace) => void;
   selectedId: number | null;
+  onLoadError?: () => void;
 }
 
 const CATEGORY_MARKERS: Record<string, string> = {
@@ -81,7 +54,7 @@ function ensureKakaoMapScript(appKey: string) {
     script.async = true;
     script.defer = true;
     script.dataset.kakaoMapSdk = 'true';
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false`;
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${appKey}&autoload=false&libraries=services`;
     script.onload = () => {
       if (!window.kakao?.maps) {
         reject(new Error('Kakao Maps SDK did not initialize.'));
@@ -94,12 +67,42 @@ function ensureKakaoMapScript(appKey: string) {
   });
 }
 
-export function KakaoMap({ appKey, places, onPlaceSelect, selectedId }: KakaoMapProps) {
+async function getKakaoStatusMessage() {
+  try {
+    const response = await fetch('/api/kakao-map-status', { cache: 'no-store' });
+    const data = (await response.json()) as {
+      ok?: boolean;
+      reason?: string;
+      message?: string;
+    };
+
+    if (data.ok) return null;
+
+    if (data.reason === 'NotAuthorizedError' && data.message?.includes('OPEN_MAP_AND_LOCAL')) {
+      return '카카오 Developers에서 OPEN_MAP_AND_LOCAL, 즉 Kakao Map 사용 설정이 아직 활성화되지 않았습니다.';
+    }
+
+    if (data.reason === 'missing_key') {
+      return '앱에 NEXT_PUBLIC_KAKAO_MAP_KEY가 설정되지 않았습니다.';
+    }
+
+    if (data.message) {
+      return data.message;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function KakaoMap({ appKey, places, onPlaceSelect, selectedId, onLoadError }: KakaoMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<InstanceType<NonNullable<typeof window.kakao>['maps']['Map']> | null>(null);
   const markersRef = useRef<Array<{ setMap: (map: unknown | null) => void }>>([]);
   const infoWindowRef = useRef<{ close: () => void } | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [diagnosticMessage, setDiagnosticMessage] = useState<string | null>(null);
   const [currentOrigin, setCurrentOrigin] = useState('');
   const selectedPlace = useMemo(
     () => (selectedId ? places.find((place) => place.id === selectedId) ?? null : null),
@@ -121,10 +124,13 @@ export function KakaoMap({ appKey, places, onPlaceSelect, selectedId }: KakaoMap
         const map = new maps.Map(containerRef.current, { center, level: 6 });
         mapRef.current = map;
         setLoadError(null);
+        setDiagnosticMessage(null);
       })
-      .catch((error: Error) => {
+      .catch(async (error: Error) => {
         if (!disposed) {
           setLoadError(error.message);
+          setDiagnosticMessage(await getKakaoStatusMessage());
+          onLoadError?.();
         }
       });
 
@@ -136,7 +142,7 @@ export function KakaoMap({ appKey, places, onPlaceSelect, selectedId }: KakaoMap
       infoWindowRef.current = null;
       mapRef.current = null;
     };
-  }, [appKey]);
+  }, [appKey, onLoadError]);
 
   useEffect(() => {
     if (!mapRef.current || !window.kakao?.maps) return;
@@ -189,13 +195,13 @@ export function KakaoMap({ appKey, places, onPlaceSelect, selectedId }: KakaoMap
   if (loadError) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-[hsl(var(--muted))] px-6 text-center">
-        <div>
+        <div className="max-w-md">
           <p className="text-sm font-semibold text-foreground">카카오맵을 불러오지 못했습니다.</p>
           <p className="mt-2 text-xs text-muted-foreground">{loadError}</p>
+          {diagnosticMessage ? <p className="mt-2 text-xs font-medium text-foreground">{diagnosticMessage}</p> : null}
           <div className="mt-3 space-y-1 text-[11px] text-muted-foreground">
             <p>현재 접속 주소: {currentOrigin || '확인 중'}</p>
-            <p>가장 흔한 원인은 JavaScript 키 대신 다른 키를 넣었거나,</p>
-            <p>카카오 Developers에 이 주소를 JavaScript SDK 도메인으로 등록하지 않은 경우입니다.</p>
+            <p>지금 확인된 원인상 도메인보다 카카오 앱의 사용 설정이 더 핵심 문제로 보입니다.</p>
           </div>
         </div>
       </div>
