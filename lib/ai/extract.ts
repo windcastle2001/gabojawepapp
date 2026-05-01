@@ -1,12 +1,19 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GEMINI_FLASH_MODEL } from '@/lib/ai/model';
 import type { NormalizedPayload } from '@/lib/adapters/types';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+function getGeminiClient() {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured');
+  }
+  return new GoogleGenerativeAI(apiKey);
+}
 
 /**
  * Gemini Flash를 사용해 raw 웹 콘텐츠에서 NormalizedPayload를 추출한다.
  *
- * - 모델: gemini-2.0-flash (비용 효율 + 구조화 JSON 충분)
+ * - 모델: gemini-3.0-flash (Flash 계열만 사용해 비용 통제)
  * - responseMimeType: application/json (마크다운 코드블록 없이 순수 JSON 반환)
  * - temperature: 0.1 (추측 최소화)
  * - 입력 최대 8000자 (컨텍스트 비용 통제)
@@ -16,8 +23,9 @@ export async function extractWithGemini(
   sourceUrl: string,
   sourceType: NormalizedPayload['source_type'],
 ): Promise<NormalizedPayload> {
+  const genAI = getGeminiClient();
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: GEMINI_FLASH_MODEL,
     generationConfig: {
       responseMimeType: 'application/json',
       temperature: 0.1,

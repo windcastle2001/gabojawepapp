@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Card } from '@/components/ui';
 import { createPrototypeSession, saveSession, type AuthMode, type GroupType } from '@/lib/prototype-store';
+import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 
 function GoogleIcon() {
@@ -62,7 +63,7 @@ function ModeCard({
     >
       <div className="flex gap-4">
         <span className="text-4xl leading-none" aria-hidden>
-          {isCouple ? '💑' : '👥'}
+          {isCouple ? '♡' : '👥'}
         </span>
         <div>
           <p className={cn('text-base font-bold', isCouple ? 'text-brand' : 'text-secondary')}>
@@ -73,8 +74,8 @@ function ModeCard({
           </p>
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
             {isCouple
-              ? '둘만의 데이트 위시리스트와 커플 리뷰를 쌓는 흐름으로 시작합니다.'
-              : '친구들과 장소를 모으고, 같이 다녀온 뒤 친구 리뷰로 공유할 수 있어요.'}
+              ? '둘만의 위시리스트와 커플 리뷰를 쌓는 흐름으로 시작합니다.'
+              : '친구들과 장소를 모으고 함께 다녀온 후 친구 리뷰로 공유할 수 있어요.'}
           </p>
         </div>
       </div>
@@ -86,10 +87,44 @@ export default function LoginPage() {
   const router = useRouter();
   const [authMode, setAuthMode] = useState<AuthMode | null>(null);
   const [groupType, setGroupType] = useState<GroupType>('couple');
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('auth') === 'google') {
+      setAuthMode('google');
+    }
+    if (params.get('error')) {
+      setAuthError('Google 로그인 처리 중 문제가 생겼어요. 잠시 뒤 다시 시도해 주세요.');
+    }
+  }, []);
 
   function enterApp(mode: AuthMode, type: GroupType) {
     saveSession(createPrototypeSession(mode, type));
     router.push('/app');
+  }
+
+  async function signInWithGoogle() {
+    setIsGoogleLoading(true);
+    setAuthError(null);
+
+    try {
+      const supabase = createClient();
+      const origin = window.location.origin;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${origin}/auth/callback?next=/login?auth=google`,
+        },
+      });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error(error);
+      setAuthError('Google 로그인 연결에 실패했어요. Supabase Google Provider 설정과 Vercel 환경변수를 확인해 주세요.');
+      setIsGoogleLoading(false);
+    }
   }
 
   return (
@@ -130,13 +165,18 @@ export default function LoginPage() {
             </div>
 
             <div className="mt-auto space-y-3 pt-8">
-              <Button onClick={() => setAuthMode('google')} className="w-full" aria-label="Google로 시작하기">
+              <Button onClick={signInWithGoogle} disabled={isGoogleLoading} className="w-full" aria-label="Google로 시작하기">
                 <GoogleIcon />
-                Google로 시작하기
+                {isGoogleLoading ? 'Google로 이동 중...' : 'Google로 시작하기'}
               </Button>
               <Button variant="outline" onClick={() => setAuthMode('guest')} className="w-full" aria-label="로그인 없이 둘러보기">
                 로그인 없이 둘러보기
               </Button>
+              {authError && (
+                <p className="rounded-xl bg-destructive/10 px-3 py-2 text-center text-xs font-medium text-destructive">
+                  {authError}
+                </p>
+              )}
               <p className="text-center text-xs text-muted-foreground">
                 둘러보기 모드에서는 커뮤니티 지도 확인이 가능하고, 초대와 AI 추천은 로그인 후 사용할 수 있어요.
               </p>
@@ -148,8 +188,8 @@ export default function LoginPage() {
               <p className="text-heading text-foreground">어떻게 시작할까요?</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {authMode === 'guest'
-                  ? '먼저 둘러보는 흐름이라도 커플용인지 친구용인지 선택해둘게요.'
-                  : '로그인 후에는 선택한 모드에 맞춰 초대와 공유 흐름이 달라집니다.'}
+                  ? '먼저 둘러보는 흐름이라도 커플용인지 친구용인지 골라둘게요.'
+                  : '로그인 후 선택한 모드에 맞춰 초대와 공유 흐름이 달라집니다.'}
               </p>
             </div>
 

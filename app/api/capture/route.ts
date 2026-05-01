@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
+import { createClient } from '@/lib/supabase/server';
 import { getRateLimitIdentifier } from '@/lib/rate-limit';
 import { parseUrl } from '@/lib/adapters/pipeline';
 import type { Database } from '@/types/database';
@@ -18,15 +18,28 @@ const ErrorCode = {
 
 type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
 
-const ratelimit = new Ratelimit({
-  redis: Redis.fromEnv(),
-  limiter: Ratelimit.slidingWindow(10, '1 m'),
-  prefix: 'gajago:capture',
+const CaptureSchema = z.object({
+  url: z.string().url('유효한 URL을 입력해 주세요.'),
 });
 
-const CaptureSchema = z.object({
-  url: z.string().url('유효한 URL을 입력해주세요.'),
-});
+let ratelimit: Ratelimit | null | undefined;
+
+function getRatelimit() {
+  if (ratelimit !== undefined) return ratelimit;
+
+  const hasUpstashEnv = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!hasUpstashEnv) {
+    ratelimit = null;
+    return ratelimit;
+  }
+
+  ratelimit = new Ratelimit({
+    redis: Redis.fromEnv(),
+    limiter: Ratelimit.slidingWindow(10, '1 m'),
+    prefix: 'gajago:capture',
+  });
+  return ratelimit;
+}
 
 function errorResponse(message: string, code: ErrorCodeType, status: number) {
   return NextResponse.json({ error: message, code, timestamp: new Date().toISOString() }, { status });
@@ -43,10 +56,13 @@ export async function POST(req: NextRequest) {
     return errorResponse('로그인이 필요합니다.', ErrorCode.UNAUTHORIZED, 401);
   }
 
-  const identifier = getRateLimitIdentifier(req, user?.id ?? 'prototype-user');
-  const { success: rateLimitOk } = await ratelimit.limit(identifier);
-  if (!rateLimitOk) {
-    return errorResponse('요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', ErrorCode.RATE_LIMITED, 429);
+  const limiter = getRatelimit();
+  if (limiter) {
+    const identifier = getRateLimitIdentifier(req, user?.id ?? 'prototype-user');
+    const { success: rateLimitOk } = await limiter.limit(identifier);
+    if (!rateLimitOk) {
+      return errorResponse('요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.', ErrorCode.RATE_LIMITED, 429);
+    }
   }
 
   let body: unknown;
@@ -58,7 +74,7 @@ export async function POST(req: NextRequest) {
 
   const parsed = CaptureSchema.safeParse(body);
   if (!parsed.success) {
-    return errorResponse('유효한 URL을 입력해주세요.', ErrorCode.VALIDATION_ERROR, 422);
+    return errorResponse('유효한 URL을 입력해 주세요.', ErrorCode.VALIDATION_ERROR, 422);
   }
 
   let result: Awaited<ReturnType<typeof parseUrl>>;
@@ -77,6 +93,7 @@ export async function POST(req: NextRequest) {
     error_msg: result.error ?? null,
   };
 
+  // Fire-and-forget logging keeps the user flow alive even if the DB schema is not applied yet.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (supabase as any)
     .from('capture_logs')
@@ -91,7 +108,7 @@ export async function POST(req: NextRequest) {
     if (result.error) {
       console.error('[capture/route] parse failed:', result.error);
     }
-    return errorResponse('링크를 분석하지 못했습니다. 링크를 확인하고 다시 시도해주세요.', ErrorCode.PARSE_FAILED, 422);
+    return errorResponse('링크를 분석하지 못했습니다. 링크를 확인하고 다시 시도해 주세요.', ErrorCode.PARSE_FAILED, 422);
   }
 
   return NextResponse.json({ data: result.payload, cached: result.cached }, { status: 200 });
