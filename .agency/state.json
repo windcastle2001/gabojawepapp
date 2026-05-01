@@ -1,0 +1,28 @@
+{
+  "project": "가자고",
+  "version": "0.1.0-prototype",
+  "last_updated": "2026-05-01T00:00:00Z",
+  "current_phase": "prototype_qa_phase",
+  "active_blockers": [],
+  "completed_critical_fixes": [
+    {
+      "blocker_id": "UX-STATE-1",
+      "description": "온보딩/커플 연결 상태를 connectedAt 기반으로 재정리하고, reset 시 legacy fallback으로 재진입하던 문제 수정",
+      "fixed_at": "2026-05-01T00:00:00Z"
+    },
+    {
+      "blocker_id": "MAP-1",
+      "description": "카카오맵 SDK 실패 시 현재 origin과 대표 원인을 바로 확인할 수 있도록 오류 UI 개선",
+      "fixed_at": "2026-05-01T00:00:00Z"
+    },
+    {
+      "blocker_id": "UX-CARET-1",
+      "description": "전역 caret/cursor 동작을 웹앱형으로 조정해 비포커스 상태에서 깜빡이는 caret 제거",
+      "fixed_at": "2026-05-01T00:00:00Z"
+    }
+  ],
+  "pending_warnings": [
+    "깨진 한글 문자열이 일부 화면(app/app/ai, app/app/map, app/app/wishlist)에 남아 있음",
+    "Next.js workspace root 경고는 상위 package-lock.json 때문에 계속 출력됨"
+  ]
+}

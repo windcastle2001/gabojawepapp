@@ -1,0 +1,14 @@
+node_modules/
+.next/
+.env.local
+tsconfig.tsbuildinfo
+
+.claude/
+.codex-staging/
+memory/
+igs-game-ops-skills/
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

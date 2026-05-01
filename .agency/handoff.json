@@ -1,0 +1,23 @@
+{
+  "from": "directorcode (Codex)",
+  "to": "front-coder / qa follow-up",
+  "timestamp": "2026-05-01T00:00:00Z",
+  "status": "prototype_state_sanitized",
+  "phase": "prototype_qa_phase",
+  "summary": "카카오맵 SDK 실패 시 현재 origin과 대표 원인을 바로 확인할 수 있게 보강했고, 온보딩/커플 연결 상태를 connectedAt 기반으로 다시 정리했다. 로그인, 홈, 사이드바에서 커플/친구 초대와 해제 흐름을 맞췄고, 전역 caret/cursor 동작도 웹앱형으로 조정했다.",
+  "completed_steps": [
+    "app/login/page.tsx 로그인/모드 선택 UI와 fresh session 시작 로직 정리",
+    "lib/prototype-store.ts 세션 스키마에 connectedAt 추가, legacy fallback과 reset 안정화",
+    "app/app/layout.tsx와 app/app/page.tsx에서 커플/친구 초대, 연결, 해제 흐름 재정렬",
+    "components/map/KakaoMap.tsx 오류 UI에 현재 origin과 대표 원인 안내 추가",
+    "app/globals.css 전역 caret/cursor 동작을 웹앱형으로 조정",
+    "npm run build 통과",
+    "npx tsc --noEmit --incremental false 통과"
+  ],
+  "next_steps": [
+    "app/app/ai/page.tsx, app/app/map/page.tsx, app/app/wishlist/page.tsx의 남은 깨진 한글 문구 정리",
+    "카카오 Developers에 http://127.0.0.1:3002 와 http://localhost:3002 도메인 등록 여부 재확인",
+    "가자고 브랜딩 잔여 문구 정리와 최종 QA"
+  ],
+  "blockers": []
+}
