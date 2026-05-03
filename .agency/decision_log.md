@@ -129,3 +129,11 @@ Decision: Gift recommendations, conflict support, and partner profile summaries 
 Reason:
 - These features strengthen the core "AI that remembers your couple" value proposition.
 - They become risky if the app silently judges personality, diagnoses users, or stores hidden inferences.
+
+## [2026-05-04] OAuth Middleware Must Fail Closed
+
+Decision: Missing Supabase env no longer enables prototype bypass implicitly. Only `PROTOTYPE_MODE=true` may bypass auth middleware.
+
+Reason:
+- A production env mistake should redirect/503 protected surfaces, not expose `/app`.
+- Supabase SSR cookie refresh must update both request and response cookies so callback/login/session flows stay consistent.

@@ -1,7 +1,7 @@
 {
   "project": "가자고",
   "version": "0.1.0-prototype",
-  "last_updated": "2026-05-04T00:55:00+09:00",
+  "last_updated": "2026-05-04T02:20:00+09:00",
   "current_phase": "couple_mvp_persistence",
   "active_blockers": [
     {
@@ -75,6 +75,11 @@
       "blocker_id": "APP-SUMMARY-1",
       "description": "Added /api/app/summary and switched logged-in sidebar/home summary reads to prefer Supabase.",
       "fixed_at": "2026-05-04T00:55:00+09:00"
+    },
+    {
+      "blocker_id": "AUTH-OAUTH-1",
+      "description": "Fixed Google OAuth callback flow by simplifying redirectTo, preserving Supabase SSR cookie refresh in middleware, and failing closed when Supabase env is missing.",
+      "fixed_at": "2026-05-04T02:20:00+09:00"
     }
   ],
   "pending_warnings": [

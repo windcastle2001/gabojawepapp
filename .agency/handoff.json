@@ -1,10 +1,10 @@
 {
   "from": "directorcode (Codex)",
   "to": "next director / persistence + live OAuth QA",
-  "timestamp": "2026-05-04T00:55:00+09:00",
-  "status": "couple_mvp_persistence_and_media_privacy_phase_2",
+  "timestamp": "2026-05-04T02:20:00+09:00",
+  "status": "google_oauth_hardening_after_live_login_failure",
   "phase": "couple_mvp_persistence",
-  "summary": "Saved product strategy, monetization, marketing, UX, and PRD updates. Hid guest/friend entry from the main login path, forced normal group creation/join to couple mode, added Supabase persistence schema for group_wishlist/review media/votes, added private Storage bucket policy for review media, applied migrations remotely, and wired first-pass wishlist/community/app-summary API paths for logged-in users.",
+  "summary": "Saved product strategy, monetization, marketing, UX, and PRD updates. Added Supabase persistence and private media storage paths, added editable AI memory, then patched the live Google OAuth failure path by simplifying redirectTo, fixing middleware Supabase env fail-closed behavior, and applying the Supabase SSR cookie refresh pattern.",
   "completed_steps": [
     "Applied Supabase advisor remediation migration and confirmed advisors report no issues.",
     "Updated types/database.ts to include groups, group_members, community_reviews, functions, and Json payload types.",
@@ -26,7 +26,10 @@
     "Added /api/app/summary and wired sidebar/home summary reads to prefer Supabase for logged-in users.",
     "Added lib/remote-store.ts and first-pass logged-in wishlist/map writes through Supabase APIs.",
     "Added private Supabase Storage bucket migration for review-media and tightened object SELECT to owner-only; public display should use server signed URLs.",
-    "Updated PRD.md and docs/product with media storage, public/private separation, gift recommendation, conflict support, and editable partner-profile AI direction."
+    "Updated PRD.md and docs/product with media storage, public/private separation, gift recommendation, conflict support, and editable partner-profile AI direction.",
+    "Patched Google OAuth callback handling after live login returned to /login with an error message.",
+    "Hardened middleware so missing Supabase env fails closed for /app and /admin instead of exposing protected pages.",
+    "Updated middleware cookie refresh flow to mutate request cookies and recreate the response before setting refreshed cookies."
   ],
   "verification": [
     "npx tsc --noEmit --incremental false: passed",
@@ -45,7 +48,9 @@
     "npx supabase db lint --db-url session-pooler-5432: No schema errors found after media storage policy tightening",
     "Supabase OAuth URL generation includes redirect_to=http://localhost:3002/auth/callback?next=/login?auth=google",
     "Gemini model gemini-3-flash-preview returned OK",
-    "DB smoke inserted users/group/members and cleanup removed test rows"
+    "DB smoke inserted users/group/members and cleanup removed test rows",
+    "npx tsc --noEmit --incremental false: passed after OAuth hardening",
+    "npm run build: passed after OAuth hardening"
   ],
   "next_steps": [
     "Perform a real browser Google OAuth login using a human account because automated credential entry was not performed.",

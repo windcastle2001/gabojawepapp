@@ -118,6 +118,7 @@ export default function LoginPage() {
         const response = await fetch('/api/groups/ensure', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
           body: JSON.stringify({ groupType: type }),
         });
         const data = (await response.json()) as { group?: GroupSnapshot; error?: string };
@@ -160,7 +161,7 @@ export default function LoginPage() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${origin}/auth/callback?next=/login?auth=google`,
+          redirectTo: `${origin}/auth/callback`,
         },
       });
 
