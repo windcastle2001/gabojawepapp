@@ -26,7 +26,10 @@ function requestSdkStatus(appKey: string) {
 }
 
 export async function GET() {
-  const appKey = process.env.NEXT_PUBLIC_KAKAO_MAP_KEY?.trim();
+  const appKey =
+    process.env.NEXT_PUBLIC_KAKAO_MAP_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_KAKAO_JAVASCRIPT_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_KAKAO_JS_KEY?.trim();
 
   if (!appKey) {
     return NextResponse.json(

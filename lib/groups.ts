@@ -14,8 +14,10 @@ export type GroupSnapshot = {
 export function createInviteCode(prefix: AppGroupType) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = prefix === 'couple' ? 'CP-' : 'FR-';
+  const values = new Uint32Array(6);
+  crypto.getRandomValues(values);
   for (let index = 0; index < 6; index += 1) {
-    code += chars[Math.floor(Math.random() * chars.length)];
+    code += chars[values[index] % chars.length];
   }
   return code;
 }

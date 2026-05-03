@@ -266,7 +266,7 @@ export default function AIPage() {
           <div>
             <h1 className="text-xl font-black text-foreground">AI 추천</h1>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Gemini 3.0 Flash 기반 · 위시 {counts.wishlist}개 · 커뮤니티 {counts.community}개
+              Gemini 3 Flash Preview 기반 · 위시 {counts.wishlist}개 · 커뮤니티 {counts.community}개
             </p>
           </div>
           <span className="shrink-0 rounded-full bg-secondary/10 px-3 py-1 text-xs font-semibold text-secondary">

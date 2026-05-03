@@ -14,8 +14,7 @@
 -- 0. Extensions
 -- ============================================================
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";   -- gen_random_uuid() 보조
-CREATE SCHEMA IF NOT EXISTS extensions;
-CREATE EXTENSION IF NOT EXISTS "pg_trgm" WITH SCHEMA extensions;    -- 향후 full-text 검색 대비
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";    -- 향후 full-text 검색 대비
 
 
 -- ============================================================
@@ -24,7 +23,6 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm" WITH SCHEMA extensions;    -- 향후 fu
 CREATE OR REPLACE FUNCTION public.fn_set_updated_at()
 RETURNS TRIGGER
 LANGUAGE plpgsql
-SET search_path = public, pg_catalog
 AS $$
 BEGIN
   NEW.updated_at := now();
@@ -365,9 +363,6 @@ DECLARE
   v_max_members   integer;
   v_group_type    text;
 BEGIN
-  -- Serialize concurrent joins for the same group before counting members.
-  PERFORM pg_advisory_xact_lock(hashtext(NEW.group_id::text));
-
   -- 해당 그룹의 현재 멤버 수 및 제한값 조회
   SELECT g.max_members, g.group_type
   INTO   v_max_members, v_group_type
@@ -426,8 +421,8 @@ SET search_path = public, pg_catalog
 AS $$
   SELECT id
   FROM   public.couples
-  WHERE  user1_id = (select auth.uid())
-     OR  user2_id = (select auth.uid());
+  WHERE  user1_id = auth.uid()
+     OR  user2_id = auth.uid();
 $$;
 
 COMMENT ON FUNCTION public.fn_my_couple_ids IS
@@ -446,9 +441,9 @@ CREATE POLICY "users_select_self_or_partner"
   ON public.users
   FOR SELECT
   USING (
-    id = (select auth.uid())
+    id = auth.uid()
     OR id = (
-      SELECT partner_id FROM public.users WHERE id = (select auth.uid())
+      SELECT partner_id FROM public.users WHERE id = auth.uid()
     )
   );
 
@@ -456,14 +451,14 @@ DROP POLICY IF EXISTS "users_update_self" ON public.users;
 CREATE POLICY "users_update_self"
   ON public.users
   FOR UPDATE
-  USING (id = (select auth.uid()))
-  WITH CHECK (id = (select auth.uid()));
+  USING (id = auth.uid())
+  WITH CHECK (id = auth.uid());
 
 DROP POLICY IF EXISTS "users_insert_self" ON public.users;
 CREATE POLICY "users_insert_self"
   ON public.users
   FOR INSERT
-  WITH CHECK (id = (select auth.uid()));
+  WITH CHECK (id = auth.uid());
 
 -- [결정] role 컬럼은 일반 사용자 직접 변경 불가 — service_role(서버)만 변경 가능
 -- [이유] 일반 유저가 role='admin'으로 자가 승격하는 권한 상승 공격 차단
@@ -482,15 +477,15 @@ CREATE POLICY "couples_access_own"
   ON public.couples
   FOR SELECT
   USING (
-    user1_id = (select auth.uid())
-    OR user2_id = (select auth.uid())
+    user1_id = auth.uid()
+    OR user2_id = auth.uid()
   );
 
 DROP POLICY IF EXISTS "couples_insert_self" ON public.couples;
 CREATE POLICY "couples_insert_self"
   ON public.couples
   FOR INSERT
-  WITH CHECK (user1_id = (select auth.uid()));
+  WITH CHECK (user1_id = auth.uid());
 
 -- [결정] couples UPDATE는 양측 모두 허용하되, invite_code 수정은 애플리케이션 레이어에서 user1_id 전용으로 제한
 -- [이유] DB 정책으로 특정 컬럼 UPDATE만 제한하려면 컬럼별 정책이 필요하나 Supabase RLS 미지원
@@ -500,19 +495,19 @@ CREATE POLICY "couples_update_own"
   ON public.couples
   FOR UPDATE
   USING (
-    user1_id = (select auth.uid())
-    OR user2_id = (select auth.uid())
+    user1_id = auth.uid()
+    OR user2_id = auth.uid()
   )
   WITH CHECK (
-    user1_id = (select auth.uid())
-    OR user2_id = (select auth.uid())
+    user1_id = auth.uid()
+    OR user2_id = auth.uid()
   );
 
 DROP POLICY IF EXISTS "couples_delete_own" ON public.couples;
 CREATE POLICY "couples_delete_own"
   ON public.couples
   FOR DELETE
-  USING (user1_id = (select auth.uid()));
+  USING (user1_id = auth.uid());
 
 
 -- ============================================================
@@ -532,7 +527,7 @@ CREATE POLICY "wishlist_insert_own_couple"
   FOR INSERT
   WITH CHECK (
     couple_id IN (SELECT public.fn_my_couple_ids())
-    AND added_by = (select auth.uid())
+    AND added_by = auth.uid()
   );
 
 DROP POLICY IF EXISTS "wishlist_update_own_couple" ON public.wishlist;
@@ -560,20 +555,20 @@ DROP POLICY IF EXISTS "public_places_select_all" ON public.public_places;
 CREATE POLICY "public_places_select_all"
   ON public.public_places
   FOR SELECT
-  USING ((select auth.uid()) IS NOT NULL);
+  USING (auth.uid() IS NOT NULL);
 
 DROP POLICY IF EXISTS "public_places_insert_self" ON public.public_places;
 CREATE POLICY "public_places_insert_self"
   ON public.public_places
   FOR INSERT
-  WITH CHECK (contributed_by = (select auth.uid()));
+  WITH CHECK (contributed_by = auth.uid());
 
 DROP POLICY IF EXISTS "public_places_update_self" ON public.public_places;
 CREATE POLICY "public_places_update_self"
   ON public.public_places
   FOR UPDATE
-  USING (contributed_by = (select auth.uid()))
-  WITH CHECK (contributed_by = (select auth.uid()));
+  USING (contributed_by = auth.uid())
+  WITH CHECK (contributed_by = auth.uid());
 
 
 -- ============================================================
@@ -588,13 +583,13 @@ CREATE POLICY "system_configs_admin_only"
   USING (
     EXISTS (
       SELECT 1 FROM public.users
-      WHERE id = (select auth.uid()) AND role = 'admin'
+      WHERE id = auth.uid() AND role = 'admin'
     )
   )
   WITH CHECK (
     EXISTS (
       SELECT 1 FROM public.users
-      WHERE id = (select auth.uid()) AND role = 'admin'
+      WHERE id = auth.uid() AND role = 'admin'
     )
   );
 
@@ -607,8 +602,8 @@ DROP POLICY IF EXISTS "capture_logs_own" ON public.capture_logs;
 CREATE POLICY "capture_logs_own"
   ON public.capture_logs
   FOR ALL
-  USING (user_id = (select auth.uid()))
-  WITH CHECK (user_id = (select auth.uid()));
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
 
 
 -- ============================================================
@@ -622,7 +617,7 @@ CREATE POLICY "capture_cache_read_valid"
   ON public.capture_cache
   FOR SELECT
   USING (
-    (select auth.uid()) IS NOT NULL
+    auth.uid() IS NOT NULL
     AND expires_at > now()
   );
 
@@ -644,7 +639,7 @@ AS $$
   SELECT ARRAY(
     SELECT group_id
     FROM   public.group_members
-    WHERE  user_id = (select auth.uid())
+    WHERE  user_id = auth.uid()
   );
 $$;
 
@@ -668,14 +663,14 @@ DROP POLICY IF EXISTS "groups_insert_self" ON public.groups;
 CREATE POLICY "groups_insert_self"
   ON public.groups
   FOR INSERT
-  WITH CHECK (created_by = (select auth.uid()));
+  WITH CHECK (created_by = auth.uid());
 
 DROP POLICY IF EXISTS "groups_update_member" ON public.groups;
-CREATE POLICY "groups_update_owner"
+CREATE POLICY "groups_update_member"
   ON public.groups
   FOR UPDATE
-  USING (created_by = (select auth.uid()))
-  WITH CHECK (created_by = (select auth.uid()));
+  USING (id = ANY(public.fn_my_group_ids()))
+  WITH CHECK (id = ANY(public.fn_my_group_ids()));
 
 -- [결정] groups DELETE는 created_by(그룹장)만 허용
 -- [이유] 일반 멤버가 그룹 자체를 삭제하는 것은 의도치 않은 데이터 손실 위험
@@ -683,7 +678,7 @@ DROP POLICY IF EXISTS "groups_delete_owner" ON public.groups;
 CREATE POLICY "groups_delete_owner"
   ON public.groups
   FOR DELETE
-  USING (created_by = (select auth.uid()));
+  USING (created_by = auth.uid());
 
 
 -- ============================================================
@@ -702,7 +697,7 @@ DROP POLICY IF EXISTS "group_members_insert_self" ON public.group_members;
 CREATE POLICY "group_members_insert_self"
   ON public.group_members
   FOR INSERT
-  WITH CHECK (user_id = (select auth.uid()));
+  WITH CHECK (user_id = auth.uid());
 
 -- [결정] 멤버 UPDATE(role 변경 등)는 RLS 레벨에서 금지, 서버 사이드 처리
 -- [이유] role='owner' 자가 승격 방지. 그룹장 위임은 back-expert API에서 service_role로 처리
@@ -711,11 +706,11 @@ CREATE POLICY "group_members_delete_self_or_owner"
   ON public.group_members
   FOR DELETE
   USING (
-    user_id = (select auth.uid())
+    user_id = auth.uid()
     OR EXISTS (
       SELECT 1 FROM public.group_members gm2
       WHERE  gm2.group_id = group_id
-        AND  gm2.user_id  = (select auth.uid())
+        AND  gm2.user_id  = auth.uid()
         AND  gm2.role     = 'owner'
     )
   );
@@ -730,17 +725,25 @@ CREATE POLICY "group_members_delete_self_or_owner"
 --   DELETE : 본인 작성 리뷰만
 -- ============================================================
 
+-- 공개 리뷰: 인증 유저 전체 읽기 (맵 커뮤니티 기능)
 DROP POLICY IF EXISTS "community_reviews_select_public" ON public.community_reviews;
-DROP POLICY IF EXISTS "community_reviews_select_private" ON public.community_reviews;
-DROP POLICY IF EXISTS "community_reviews_select_visible" ON public.community_reviews;
-CREATE POLICY "community_reviews_select_visible"
+CREATE POLICY "community_reviews_select_public"
   ON public.community_reviews
   FOR SELECT
   USING (
-    (select auth.uid()) IS NOT NULL
+    auth.uid() IS NOT NULL
+    AND is_public = true
+  );
+
+-- 비공개 리뷰: 작성자 또는 같은 그룹만 읽기
+DROP POLICY IF EXISTS "community_reviews_select_private" ON public.community_reviews;
+CREATE POLICY "community_reviews_select_private"
+  ON public.community_reviews
+  FOR SELECT
+  USING (
+    is_public = false
     AND (
-      is_public = true
-      OR user_id = (select auth.uid())
+      user_id = auth.uid()
       OR group_id = ANY(public.fn_my_group_ids())
     )
   );
@@ -750,22 +753,22 @@ CREATE POLICY "community_reviews_insert_self"
   ON public.community_reviews
   FOR INSERT
   WITH CHECK (
-    (select auth.uid()) IS NOT NULL
-    AND user_id = (select auth.uid())
+    auth.uid() IS NOT NULL
+    AND user_id = auth.uid()
   );
 
 DROP POLICY IF EXISTS "community_reviews_update_self" ON public.community_reviews;
 CREATE POLICY "community_reviews_update_self"
   ON public.community_reviews
   FOR UPDATE
-  USING (user_id = (select auth.uid()))
-  WITH CHECK (user_id = (select auth.uid()));
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
 
 DROP POLICY IF EXISTS "community_reviews_delete_self" ON public.community_reviews;
 CREATE POLICY "community_reviews_delete_self"
   ON public.community_reviews
   FOR DELETE
-  USING (user_id = (select auth.uid()));
+  USING (user_id = auth.uid());
 
 
 -- ============================================================

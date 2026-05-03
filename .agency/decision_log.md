@@ -61,10 +61,36 @@ Reason:
 - Full wishlist/community persistence is a larger data migration and should be done as a focused backend step.
 - The prototype can still show the intended product flow if login, invite, map, AI, and local pin creation all work coherently.
 
-## [2026-05-02] Use Gemini 3.0 Flash Only
+## [2026-05-02] Use Gemini 3 Flash Preview Only
 
-Decision: Centralize all Gemini calls through `lib/ai/model.ts` and keep the model id as `gemini-3.0-flash`.
+Decision: Centralize all Gemini calls through `lib/ai/model.ts` and keep the model id as `gemini-3-flash-preview`.
 
 Reason:
-- The user explicitly requested this model only for cost control.
-- If the API project rejects that model id, the UI now exposes fallback diagnostics rather than silently failing.
+- The user explicitly requested a Gemini Flash-only path for cost control.
+- The earlier `gemini-3.0-flash` value was not accepted by the live Gemini API, while `gemini-3-flash-preview` passed a live smoke call.
+
+## [2026-05-03] Admin Route Is Separate From User App
+
+Decision: Implement `/admin` as a server-rendered admin surface guarded by both Supabase session and `users.role = 'admin'`, separate from `/app`.
+
+Reason:
+- Operators need logs, feature flags, users, and group status without exposing those controls in the normal user navigation.
+- A server route keeps service-role reads and role mutations off the client bundle.
+- Normal users should be redirected back to `/app` if they are signed in but not admins.
+
+## [2026-05-03] Use Session Pooler For Supabase CLI
+
+Decision: Use the Supabase pooler session port `5432` for `db push`, `db advisors`, and smoke queries instead of transaction port `6543`.
+
+Reason:
+- Transaction pooler mode can reject prepared statements used by the Supabase CLI.
+- Session port completed migrations, advisors, and smoke queries reliably.
+
+## [2026-05-03] Harden Group And Admin Controls After QA
+
+Decision: Serialize group member-limit checks in the database, restrict group row updates to group owners, and prevent admin self-demotion or last-admin removal.
+
+Reason:
+- API-side count checks are not enough under concurrent invite acceptance.
+- Member-wide group UPDATE RLS would allow future client code to mutate operational fields.
+- Admin dashboards need a lockout guard before real operation.

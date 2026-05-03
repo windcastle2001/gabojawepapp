@@ -42,6 +42,8 @@ export default function JoinInvitePage() {
       saveSession({
         ...session,
         inviteCode: data.group.inviteCode,
+        inviteUrl: data.group.inviteUrl,
+        remoteGroupId: data.group.id,
         partnerAccepted: data.group.groupType === 'couple' ? data.group.memberCount >= 2 : false,
         friendMembers: data.group.groupType === 'friends' ? data.group.memberCount : 1,
         connectedAt: data.group.memberCount >= 2 ? new Date().toISOString().split('T')[0] : null,

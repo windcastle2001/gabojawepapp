@@ -1,27 +1,45 @@
 {
   "from": "directorcode (Codex)",
-  "to": "next director / backend persistence",
-  "timestamp": "2026-05-02T00:00:00+09:00",
-  "status": "prototype_polish_auth_ai_map_invite",
-  "phase": "prototype_feature_polish",
-  "summary": "Rebuilt the visible prototype flow in clean Korean. Google OAuth now leads into group creation, invite links can be accepted at /join/[code], Kakao map has visible fallback diagnostics, place search has REST fallback, AI is segmented into course/wishlist/link flows, and wishlist completion can publish a map pin locally.",
+  "to": "next director / persistence + live OAuth QA",
+  "timestamp": "2026-05-03T20:30:00+09:00",
+  "status": "admin_ai_map_auth_db_smoke_and_hardening_complete",
+  "phase": "prototype_operational_verification",
+  "summary": "Supabase schema and advisor fixes are applied. Added a guarded /admin dashboard, refreshed database types, corrected the Gemini Flash model id, improved map search markers, hardened group ensure/join APIs, applied QA hardening for admin role safety and group RLS, and ran build plus targeted live smoke checks.",
   "completed_steps": [
-    "Added /api/groups/ensure, /api/groups/join, and /join/[code] for real Supabase-backed invite acceptance.",
-    "Connected login mode selection to /api/groups/ensure for Google users.",
-    "Rebuilt app home, sidebar, map, wishlist, and AI pages with clean Korean copy.",
-    "Added /api/kakao/search using KAKAO_REST_API_KEY as fallback when Kakao JS SDK services are not available.",
-    "Guarded /api/capture and capture cache so prototype mode and missing optional envs do not crash the route.",
-    "Kept Gemini calls centralized on gemini-3.0-flash only.",
-    "Ran npm run build successfully."
+    "Applied Supabase advisor remediation migration and confirmed advisors report no issues.",
+    "Updated types/database.ts to include groups, group_members, community_reviews, functions, and Json payload types.",
+    "Added /admin with role guard, dashboard stats, capture logs, system config upsert, user role change, and recent group overview.",
+    "Reworked /api/groups/ensure and /api/groups/join to avoid relationship any-casts, return cleaner errors, and preserve invite remoteGroupId on join.",
+    "Changed invite code generation from Math.random() to crypto.getRandomValues().",
+    "Changed Gemini model id to gemini-3-flash-preview and confirmed a live Gemini smoke response.",
+    "Made Kakao search results appear as temporary map markers and aligned kakao-map-status env alias handling.",
+    "Applied Supabase migration 20260503111500_harden_group_admin_controls.sql to serialize group capacity checks and restrict group row updates to owners.",
+    "Added admin role lockout protection so operators cannot demote themselves or remove the last admin.",
+    "Made Gemini Flash model overrideable with GEMINI_FLASH_MODEL while keeping gemini-3-flash-preview as the default.",
+    "Ran production build, local production HTTP smoke, OAuth URL generation smoke, Gemini smoke, and DB group insert/cleanup smoke."
+  ],
+  "verification": [
+    "npx tsc --noEmit --incremental false: passed",
+    "npm run build: passed",
+    "GET http://localhost:3002/login: 200",
+    "GET http://localhost:3002/admin without session: 307 to /login",
+    "GET http://localhost:3002/api/kakao-map-status: 200",
+    "npx supabase db lint --db-url session-pooler-5432: No schema errors found",
+    "Supabase OAuth URL generation includes redirect_to=http://localhost:3002/auth/callback?next=/login?auth=google",
+    "Gemini model gemini-3-flash-preview returned OK",
+    "DB smoke inserted users/group/members and cleanup removed test rows"
   ],
   "next_steps": [
-    "Apply schema.sql to Supabase if not already applied; groups/group_members/users are required for invite APIs.",
-    "Implement Supabase-backed wishlist/community persistence so partners and friends see shared pins across devices.",
-    "Smoke-test deployed Vercel domain in Kakao Developers JavaScript SDK domain settings and Supabase OAuth redirect URL settings.",
-    "If Gemini rejects gemini-3.0-flash, confirm the exact model id enabled in the user's Gemini project and update lib/ai/model.ts only if the user approves."
+    "Perform a real browser Google OAuth login using a human account because automated credential entry was not performed.",
+    "Promote the operator account in public.users.role to admin before using /admin.",
+    "Confirm Supabase Auth redirect allowlist contains local http://localhost:3002/auth/callback and production https://gabojawepapp.vercel.app/auth/callback.",
+    "Confirm Kakao Developers JavaScript origins include localhost:3002 and production origin, and Kakao Map API is enabled.",
+    "Implement full Supabase-backed wishlist/community persistence so cross-device pins are no longer local-only."
   ],
   "blockers": [
-    "Cross-device shared pins are not fully persisted yet; current map share is local prototype storage.",
-    "gemini-3.0-flash model availability depends on the user's Gemini API account/project."
+    "Actual Google credential login cannot be completed non-interactively in this environment.",
+    "Wishlist/community map data is still mostly local prototype storage, so full cross-device sharing is not yet implemented.",
+    "Docker is not available, so supabase gen types could not run through postgres-meta; types were manually synchronized from the applied schema.",
+    "SUPABASE_DB_URL currently points at transaction pooler port 6543; Supabase CLI lint/advisor commands should be run with session pooler port 5432."
   ]
 }

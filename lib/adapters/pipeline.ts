@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { extractWithGemini } from '@/lib/ai/extract';
 import { assertSafeFetchUrl } from './safe-fetch';
 import { selectAdapter } from './registry';
+import type { Json } from '@/types/database';
 import type { AdapterResult, NormalizedPayload } from './types';
 
 export const USER_AGENT = 'GajagoBot/1.0 (+https://gajago.kr/bot)';
@@ -71,7 +72,7 @@ export async function parseUrl(rawUrl: string): Promise<AdapterResult> {
     try {
       await supabaseAdmin.from('capture_cache').upsert({
         url_hash: urlHash,
-        payload: payload as unknown as Record<string, unknown>,
+        payload: payload as unknown as Json,
         expires_at: new Date(Date.now() + CACHE_TTL_HOURS * 60 * 60 * 1000).toISOString(),
       });
     } catch {

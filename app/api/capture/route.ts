@@ -17,6 +17,12 @@ const ErrorCode = {
 } as const;
 
 type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
+type CaptureLogInsert = Database['public']['Tables']['capture_logs']['Insert'];
+type CaptureLogWriter = {
+  from(table: 'capture_logs'): {
+    insert(values: CaptureLogInsert): PromiseLike<{ error: { message: string } | null }>;
+  };
+};
 
 const CaptureSchema = z.object({
   url: z.string().url('유효한 URL을 입력해 주세요.'),
@@ -101,7 +107,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (supabase) {
-    const captureLogInsert: Database['public']['Tables']['capture_logs']['Insert'] = {
+    const captureLogInsert: CaptureLogInsert = {
       user_id: user?.id ?? 'prototype-user',
       source_url: parsed.data.url,
       source_type: result.payload?.source_type ?? null,
@@ -109,11 +115,11 @@ export async function POST(req: NextRequest) {
       error_msg: result.error ?? null,
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (supabase as any)
+    const captureLogWriter = supabase as unknown as CaptureLogWriter;
+    captureLogWriter
       .from('capture_logs')
       .insert(captureLogInsert)
-      .then(({ error }: { error: { message: string } | null }) => {
+      .then(({ error }) => {
         if (error) console.error('[capture/route] capture log insert failed:', error.message);
       });
   }

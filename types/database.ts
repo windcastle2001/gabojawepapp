@@ -1,9 +1,10 @@
-// Supabase JS v2.45+ / PostgREST v12 호환 Database 타입
-// @supabase/postgrest-js 2.103.x GenericSchema 충족 조건:
-//   - Tables: Record<string, GenericTable>
-//   - Views: Record<string, GenericView>  (never 금지 — GenericView 바운드 미충족)
-//   - Functions: Record<string, GenericFunction>
-// GenericTable 충족 조건: Row, Insert, Update, Relationships 필수
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
 
 export type Database = {
   public: {
@@ -19,7 +20,7 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
-          id: string;
+          id?: string;
           email: string;
           name?: string | null;
           role?: 'user' | 'admin';
@@ -75,7 +76,7 @@ export type Database = {
         Row: {
           id: string;
           couple_id: string;
-          category: '음식' | '카페' | '장소' | '선물' | '여행' | '영상참고' | '기타' | null;
+          category: string | null;
           title: string;
           address: string | null;
           lat: number | null;
@@ -101,7 +102,7 @@ export type Database = {
         Insert: {
           id?: string;
           couple_id: string;
-          category?: '음식' | '카페' | '장소' | '선물' | '여행' | '영상참고' | '기타' | null;
+          category?: string | null;
           title: string;
           address?: string | null;
           lat?: number | null;
@@ -127,7 +128,7 @@ export type Database = {
         Update: {
           id?: string;
           couple_id?: string;
-          category?: '음식' | '카페' | '장소' | '선물' | '여행' | '영상참고' | '기타' | null;
+          category?: string | null;
           title?: string;
           address?: string | null;
           lat?: number | null;
@@ -191,6 +192,111 @@ export type Database = {
         };
         Relationships: [];
       };
+      groups: {
+        Row: {
+          id: string;
+          name: string;
+          group_type: 'couple' | 'friends';
+          max_members: number;
+          invite_code: string;
+          invite_expires_at: string | null;
+          created_by: string;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          group_type?: 'couple' | 'friends';
+          max_members?: number;
+          invite_code: string;
+          invite_expires_at?: string | null;
+          created_by: string;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          group_type?: 'couple' | 'friends';
+          max_members?: number;
+          invite_code?: string;
+          invite_expires_at?: string | null;
+          created_by?: string;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      group_members: {
+        Row: {
+          id: string;
+          group_id: string;
+          user_id: string;
+          role: 'owner' | 'member';
+          joined_at: string;
+        };
+        Insert: {
+          id?: string;
+          group_id: string;
+          user_id: string;
+          role?: 'owner' | 'member';
+          joined_at?: string;
+        };
+        Update: {
+          id?: string;
+          group_id?: string;
+          user_id?: string;
+          role?: 'owner' | 'member';
+          joined_at?: string;
+        };
+        Relationships: [];
+      };
+      community_reviews: {
+        Row: {
+          id: string;
+          place_id: string;
+          group_id: string | null;
+          user_id: string;
+          review_type: 'couple' | 'friends';
+          rating: number | null;
+          content: string | null;
+          image_urls: string[] | null;
+          is_public: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          place_id: string;
+          group_id?: string | null;
+          user_id: string;
+          review_type?: 'couple' | 'friends';
+          rating?: number | null;
+          content?: string | null;
+          image_urls?: string[] | null;
+          is_public?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          place_id?: string;
+          group_id?: string | null;
+          user_id?: string;
+          review_type?: 'couple' | 'friends';
+          rating?: number | null;
+          content?: string | null;
+          image_urls?: string[] | null;
+          is_public?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       system_configs: {
         Row: {
           id: string;
@@ -227,7 +333,7 @@ export type Database = {
           user_id: string;
           source_type?: string | null;
           source_url?: string | null;
-          success: boolean;
+          success?: boolean;
           error_msg?: string | null;
           created_at?: string;
         };
@@ -246,31 +352,45 @@ export type Database = {
         Row: {
           id: string;
           url_hash: string;
-          payload: Record<string, unknown> | null;
+          payload: Json | null;
           expires_at: string;
           created_at: string;
         };
         Insert: {
           id?: string;
           url_hash: string;
-          payload?: Record<string, unknown> | null;
+          payload?: Json | null;
           expires_at: string;
           created_at?: string;
         };
         Update: {
           id?: string;
           url_hash?: string;
-          payload?: Record<string, unknown> | null;
+          payload?: Json | null;
           expires_at?: string;
           created_at?: string;
         };
         Relationships: [];
       };
     };
-    Views: Record<PropertyKey, never>; // 현재 뷰 없음. supabase gen types 실행 시 자동 채워짐
+    Views: Record<string, never>;
     Functions: {
-      fn_my_couple_ids: { Args: Record<never, never>; Returns: string[] };
-      fn_purge_expired_cache: { Args: Record<never, never>; Returns: number };
+      fn_check_group_member_limit: {
+        Args: Record<string, never>;
+        Returns: unknown;
+      };
+      fn_my_couple_ids: {
+        Args: Record<string, never>;
+        Returns: string[];
+      };
+      fn_my_group_ids: {
+        Args: Record<string, never>;
+        Returns: string[];
+      };
+      fn_purge_expired_cache: {
+        Args: Record<string, never>;
+        Returns: number;
+      };
     };
   };
 };

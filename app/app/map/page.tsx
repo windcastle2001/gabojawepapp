@@ -312,6 +312,22 @@ export default function CommunityMapPage() {
     });
   }, [activeCategory, activeReviewFilter, nearbyOnly, places, searchQuery, userLocation]);
 
+  const mapPlaces = useMemo<CommunityPlace[]>(() => {
+    const communityMarkers = filteredPlaces.map((place) => ({ ...place }));
+    const searchMarkers = searchResults.map((result, index) => ({
+      id: -1 * (index + 1),
+      title: result.title,
+      category: result.category,
+      address: result.address,
+      rating: 0,
+      reviewCount: 0,
+      lat: result.lat,
+      lng: result.lng,
+    }));
+
+    return [...communityMarkers, ...searchMarkers];
+  }, [filteredPlaces, searchResults]);
+
   function handleAddWish(place: { title: string; category: string; address: string; lat: number; lng: number; sourceUrl?: string | null }) {
     const added = addWishFromPlace({
       title: place.title,
@@ -441,7 +457,22 @@ export default function CommunityMapPage() {
   return (
     <div className="relative flex h-screen flex-col overflow-hidden">
       <div className="absolute inset-0 z-0">
-        <CommunityMap places={filteredPlaces as CommunityPlace[]} onPlaceSelect={(place) => setSelectedPlace(places.find((item) => item.id === place.id) ?? null)} selectedId={selectedPlace?.id ?? null} />
+        <CommunityMap
+          places={mapPlaces}
+          onPlaceSelect={(place) => {
+            const communityPlace = places.find((item) => item.id === place.id);
+            if (communityPlace) {
+              setSelectedPlace(communityPlace);
+              return;
+            }
+
+            const searchResult = searchResults.find((item) => item.title === place.title && item.address === place.address);
+            if (searchResult) {
+              openReportForResult(searchResult);
+            }
+          }}
+          selectedId={selectedPlace?.id ?? null}
+        />
       </div>
 
       <div className="pointer-events-none relative z-10">
