@@ -8,7 +8,8 @@ import type { CommunityPlace } from './types';
 interface CommunityMapProps {
   places: CommunityPlace[];
   onPlaceSelect: (place: CommunityPlace) => void;
-  selectedId: number | null;
+  selectedId: number | string | null;
+  userLocation?: { lat: number; lng: number } | null;
 }
 
 function getKakaoAppKey() {
@@ -20,7 +21,7 @@ function getKakaoAppKey() {
   );
 }
 
-export function CommunityMap({ places, onPlaceSelect, selectedId }: CommunityMapProps) {
+export function CommunityMap({ places, onPlaceSelect, selectedId, userLocation }: CommunityMapProps) {
   const kakaoAppKey = getKakaoAppKey();
   const [preferKakao, setPreferKakao] = useState(Boolean(kakaoAppKey));
   const [fallbackMessage, setFallbackMessage] = useState<string | null>(null);
@@ -36,6 +37,7 @@ export function CommunityMap({ places, onPlaceSelect, selectedId }: CommunityMap
         places={places}
         onPlaceSelect={onPlaceSelect}
         selectedId={selectedId}
+        userLocation={userLocation}
         onLoadError={(message) => {
           setFallbackMessage(message);
           setPreferKakao(false);
@@ -46,7 +48,7 @@ export function CommunityMap({ places, onPlaceSelect, selectedId }: CommunityMap
 
   return (
     <div className="relative h-full w-full">
-      <LeafletMap places={places} onPlaceSelect={onPlaceSelect} selectedId={selectedId} />
+      <LeafletMap places={places} onPlaceSelect={onPlaceSelect} selectedId={selectedId} userLocation={userLocation} />
       <div className="pointer-events-none absolute bottom-4 left-4 max-w-xs rounded-2xl border border-border/80 bg-background/90 px-3 py-2 shadow-sm backdrop-blur">
         <p className="text-[11px] font-semibold text-foreground">
           {kakaoAppKey ? '카카오맵 연결 전까지 대체 지도를 표시 중' : '대체 지도를 표시 중'}

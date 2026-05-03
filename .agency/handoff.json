@@ -1,10 +1,10 @@
 {
   "from": "directorcode (Codex)",
   "to": "next director / persistence + live OAuth QA",
-  "timestamp": "2026-05-03T20:30:00+09:00",
-  "status": "admin_ai_map_auth_db_smoke_and_hardening_complete",
-  "phase": "prototype_operational_verification",
-  "summary": "Supabase schema and advisor fixes are applied. Added a guarded /admin dashboard, refreshed database types, corrected the Gemini Flash model id, improved map search markers, hardened group ensure/join APIs, applied QA hardening for admin role safety and group RLS, and ran build plus targeted live smoke checks.",
+  "timestamp": "2026-05-04T00:55:00+09:00",
+  "status": "couple_mvp_persistence_and_media_privacy_phase_2",
+  "phase": "couple_mvp_persistence",
+  "summary": "Saved product strategy, monetization, marketing, UX, and PRD updates. Hid guest/friend entry from the main login path, forced normal group creation/join to couple mode, added Supabase persistence schema for group_wishlist/review media/votes, added private Storage bucket policy for review media, applied migrations remotely, and wired first-pass wishlist/community/app-summary API paths for logged-in users.",
   "completed_steps": [
     "Applied Supabase advisor remediation migration and confirmed advisors report no issues.",
     "Updated types/database.ts to include groups, group_members, community_reviews, functions, and Json payload types.",
@@ -16,7 +16,17 @@
     "Applied Supabase migration 20260503111500_harden_group_admin_controls.sql to serialize group capacity checks and restrict group row updates to owners.",
     "Added admin role lockout protection so operators cannot demote themselves or remove the last admin.",
     "Made Gemini Flash model overrideable with GEMINI_FLASH_MODEL while keeping gemini-3-flash-preview as the default.",
-    "Ran production build, local production HTTP smoke, OAuth URL generation smoke, Gemini smoke, and DB group insert/cleanup smoke."
+    "Ran production build, local production HTTP smoke, OAuth URL generation smoke, Gemini smoke, and DB group insert/cleanup smoke.",
+    "Patched login callback flow so /login?auth=google auto-calls /api/groups/ensure, saves local app session, and navigates to /app.",
+    "Changed prototype wishlist/community storage keys to v4 with empty defaults so seeded items no longer appear for fresh users.",
+    "Patched map and fallback map components to accept userLocation and center there when available.",
+    "Added docs/product/product_strategy.md, monetization_marketing.md, decision_log.md, and ux_policy.md as living product memory.",
+    "Added migration 20260503123000_add_persistent_couple_content.sql for group_wishlist, review_media, review_votes, public_places global fields, and community_reviews amount/translations/recommendations.",
+    "Added /api/wishlist, /api/wishlist/[id], /api/wishlist/[id]/share, /api/community/places, and /api/reviews/[id]/vote.",
+    "Added /api/app/summary and wired sidebar/home summary reads to prefer Supabase for logged-in users.",
+    "Added lib/remote-store.ts and first-pass logged-in wishlist/map writes through Supabase APIs.",
+    "Added private Supabase Storage bucket migration for review-media and tightened object SELECT to owner-only; public display should use server signed URLs.",
+    "Updated PRD.md and docs/product with media storage, public/private separation, gift recommendation, conflict support, and editable partner-profile AI direction."
   ],
   "verification": [
     "npx tsc --noEmit --incremental false: passed",
@@ -25,6 +35,14 @@
     "GET http://localhost:3002/admin without session: 307 to /login",
     "GET http://localhost:3002/api/kakao-map-status: 200",
     "npx supabase db lint --db-url session-pooler-5432: No schema errors found",
+    "npx tsc --noEmit --incremental false: passed after OAuth/map/local storage patch",
+    "npm run build: passed after OAuth/map/local storage patch",
+    "npm run build: passed after persistence phase 1",
+    "npm run build: passed after app summary and Storage privacy migrations",
+    "npx supabase db push --db-url session-pooler-5432: applied 20260503123000_add_persistent_couple_content.sql",
+    "npx supabase db push --db-url session-pooler-5432: applied 20260504003000_add_review_media_storage_bucket.sql and 20260504004500_tighten_review_media_storage_select.sql",
+    "npx supabase db lint --db-url session-pooler-5432: No schema errors found after persistence migration",
+    "npx supabase db lint --db-url session-pooler-5432: No schema errors found after media storage policy tightening",
     "Supabase OAuth URL generation includes redirect_to=http://localhost:3002/auth/callback?next=/login?auth=google",
     "Gemini model gemini-3-flash-preview returned OK",
     "DB smoke inserted users/group/members and cleanup removed test rows"
@@ -34,11 +52,14 @@
     "Promote the operator account in public.users.role to admin before using /admin.",
     "Confirm Supabase Auth redirect allowlist contains local http://localhost:3002/auth/callback and production https://gabojawepapp.vercel.app/auth/callback.",
     "Confirm Kakao Developers JavaScript origins include localhost:3002 and production origin, and Kakao Map API is enabled.",
-    "Implement full Supabase-backed wishlist/community persistence so cross-device pins are no longer local-only."
+    "Perform real browser login and test logged-in wishlist create/complete/share plus map place create/save.",
+    "Complete full replacement of remaining localStorage reads in home/layout/AI counts with server summary APIs.",
+    "Add Supabase Storage upload UI/API for review images/videos and server-signed media URL delivery for public reviews.",
+    "Add couple memory tables and UI for editable partner/couple profiles."
   ],
   "blockers": [
     "Actual Google credential login cannot be completed non-interactively in this environment.",
-    "Wishlist/community map data is still mostly local prototype storage, so full cross-device sharing is not yet implemented.",
+    "Wishlist/community logged-in writes now have Supabase API paths, but home/layout/AI summaries still read prototype-store and need a second pass.",
     "Docker is not available, so supabase gen types could not run through postgres-meta; types were manually synchronized from the applied schema.",
     "SUPABASE_DB_URL currently points at transaction pooler port 6543; Supabase CLI lint/advisor commands should be run with session pooler port 5432."
   ]

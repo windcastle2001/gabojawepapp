@@ -5,12 +5,14 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { getCommunityPlaces, getSession, getWishlist, saveSession, type PrototypeSession } from '@/lib/prototype-store';
+import { getRemoteAppSummary } from '@/lib/remote-store';
 
 const TABS = [
   { id: 'home', emoji: '🏠', label: '홈', href: '/app' },
   { id: 'wishlist', emoji: '📌', label: '위시', href: '/app/wishlist' },
   { id: 'community', emoji: '🗺️', label: '커뮤니티', href: '/app/map' },
   { id: 'ai', emoji: '🤖', label: 'AI 추천', href: '/app/ai' },
+  { id: 'memory', emoji: 'AI', label: 'AI 메모리', href: '/app/memory' },
 ];
 
 function formatConnectedLabel(connectedAt: string | null) {
@@ -150,9 +152,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     const sync = () => {
       const nextSession = getSession();
+      setSession(nextSession);
+      if (nextSession.authMode === 'google') {
+        getRemoteAppSummary()
+          .then((summary) => setCounts(summary.counts))
+          .catch(() => undefined);
+        return;
+      }
       const wishlist = getWishlist();
       const community = getCommunityPlaces();
-      setSession(nextSession);
       setCounts({
         wishlist: wishlist.filter((item) => !item.completed).length,
         completed: wishlist.filter((item) => item.completed).length,

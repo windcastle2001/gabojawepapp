@@ -18,7 +18,7 @@ export interface PrototypeSession {
 }
 
 export interface PrototypeWish {
-  id: number;
+  id: number | string;
   title: string;
   type: 'place' | 'activity';
   category: string;
@@ -40,7 +40,7 @@ export interface PrototypeWish {
 }
 
 export interface PrototypeReview {
-  id: number;
+  id: number | string;
   author: string;
   text: string;
   rating: number;
@@ -49,7 +49,7 @@ export interface PrototypeReview {
 }
 
 export interface PrototypeCommunityPlace {
-  id: number;
+  id: number | string;
   title: string;
   category: string;
   address: string;
@@ -92,8 +92,8 @@ export interface AddCommunityPlaceInput {
 }
 
 const SESSION_KEY = 'dm_session_v3';
-const WISHLIST_KEY = 'dm_wishlist_v3';
-const COMMUNITY_KEY = 'dm_community_places_v3';
+const WISHLIST_KEY = 'dm_wishlist_v4';
+const COMMUNITY_KEY = 'dm_community_places_v4';
 
 function today() {
   return new Date().toISOString().split('T')[0];
@@ -363,7 +363,7 @@ export function saveSession(session: PrototypeSession) {
 }
 
 export function getWishlist() {
-  return readJson<PrototypeWish[]>(WISHLIST_KEY, DEFAULT_WISHLIST);
+  return readJson<PrototypeWish[]>(WISHLIST_KEY, []);
 }
 
 export function saveWishlist(items: PrototypeWish[]) {
@@ -371,7 +371,7 @@ export function saveWishlist(items: PrototypeWish[]) {
 }
 
 export function getCommunityPlaces() {
-  return readJson<PrototypeCommunityPlace[]>(COMMUNITY_KEY, DEFAULT_COMMUNITY_PLACES);
+  return readJson<PrototypeCommunityPlace[]>(COMMUNITY_KEY, []);
 }
 
 export function saveCommunityPlaces(places: PrototypeCommunityPlace[]) {
@@ -411,7 +411,7 @@ export function addWishFromPlace(place: AddWishInput) {
   return true;
 }
 
-export function completeWish(id: number, rating: number, review: string) {
+export function completeWish(id: number | string, rating: number, review: string) {
   const nextItems = getWishlist().map((item) =>
     item.id === id
       ? {
@@ -428,7 +428,7 @@ export function completeWish(id: number, rating: number, review: string) {
   return nextItems.find((item) => item.id === id) ?? null;
 }
 
-export function reopenWish(id: number) {
+export function reopenWish(id: number | string) {
   const nextItems = getWishlist().map((item) =>
     item.id === id
       ? {
@@ -498,7 +498,7 @@ export function addCommunityPlace(input: AddCommunityPlaceInput, session?: Proto
 }
 
 export function shareWishReviewToCommunity(item: PrototypeWish, session: PrototypeSession) {
-  if (!item.address || !item.review || !item.rating) return false;
+  if (!item.address || !item.review || !item.rating || !item.lat || !item.lng) return false;
 
   addCommunityPlace(
     {
@@ -528,6 +528,6 @@ export function shareWishReviewToCommunity(item: PrototypeWish, session: Prototy
 
 export function resetPrototypeData() {
   saveSession(DEFAULT_SESSION);
-  saveWishlist(DEFAULT_WISHLIST);
-  saveCommunityPlaces(DEFAULT_COMMUNITY_PLACES);
+  saveWishlist([]);
+  saveCommunityPlaces([]);
 }

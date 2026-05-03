@@ -1,12 +1,12 @@
 {
   "project": "가자고",
   "version": "0.1.0-prototype",
-  "last_updated": "2026-05-03T20:30:00+09:00",
-  "current_phase": "prototype_operational_verification",
+  "last_updated": "2026-05-04T00:55:00+09:00",
+  "current_phase": "couple_mvp_persistence",
   "active_blockers": [
     {
       "id": "REMOTE-DATA-1",
-      "description": "Wishlist/community pins still use local prototype storage for most flows. Real cross-device sharing requires Supabase persistence for wishlist, public_places, and community_reviews.",
+      "description": "Logged-in wishlist/map writes and app sidebar/home summary reads now prefer Supabase, but AI prompt context and full media upload/display still need server-backed replacement.",
       "severity": "medium"
     },
     {
@@ -50,6 +50,31 @@
       "blocker_id": "QA-HARDEN-1",
       "description": "Applied QA hardening: admin lockout protection, group capacity advisory lock, owner-only groups update RLS, and Gemini model env override.",
       "fixed_at": "2026-05-03T20:30:00+09:00"
+    },
+    {
+      "blocker_id": "UX-LOGIN-MAP-1",
+      "description": "Patched OAuth-to-app session bridge, removed seeded prototype wishlist/community defaults for v4 storage keys, and centered maps on browser geolocation when available.",
+      "fixed_at": "2026-05-03T21:20:00+09:00"
+    },
+    {
+      "blocker_id": "PERSISTENCE-1",
+      "description": "Added Supabase group_wishlist/review media/vote schema, applied remote migration, added wishlist/community APIs, and wired first-pass logged-in wishlist/map writes.",
+      "fixed_at": "2026-05-03T21:55:00+09:00"
+    },
+    {
+      "blocker_id": "PRODUCT-MEMORY-1",
+      "description": "Saved evolving product, monetization, marketing, and UX decisions in docs/product for future updates.",
+      "fixed_at": "2026-05-03T21:55:00+09:00"
+    },
+    {
+      "blocker_id": "MEDIA-PRIVACY-1",
+      "description": "Added private review-media Storage bucket and owner-only object reads; public display should be implemented via signed URL/API mediation.",
+      "fixed_at": "2026-05-04T00:55:00+09:00"
+    },
+    {
+      "blocker_id": "APP-SUMMARY-1",
+      "description": "Added /api/app/summary and switched logged-in sidebar/home summary reads to prefer Supabase.",
+      "fixed_at": "2026-05-04T00:55:00+09:00"
     }
   ],
   "pending_warnings": [

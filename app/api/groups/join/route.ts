@@ -83,6 +83,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '만료된 초대 코드입니다.' }, { status: 410 });
     }
 
+    if (group.group_type !== 'couple') {
+      return NextResponse.json({ error: 'Currently only couple invites are supported.' }, { status: 403 });
+    }
+
     const { data: existingMember } = await admin
       .from('group_members')
       .select('id')

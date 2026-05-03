@@ -14,12 +14,27 @@ type PlaceInput = {
   reviewCount?: number;
 };
 
+type MemoryInput = {
+  title: string;
+  content: string;
+  memoryType?: string;
+  isAiUsable?: boolean;
+};
+
 type PlanRequest = {
   mode?: AiMode;
   message?: string;
   groupType?: 'couple' | 'friends' | null;
   wishlist?: PlaceInput[];
   communityPlaces?: PlaceInput[];
+  memories?: MemoryInput[];
+  profiles?: Array<{
+    displayName?: string | null;
+    mbti?: string | null;
+    zodiac?: string | null;
+    personalitySummary?: string | null;
+    importantNotes?: string[];
+  }>;
 };
 
 type Diagnostic = {
@@ -50,6 +65,14 @@ function compactPlace(place: PlaceInput) {
     completed: Boolean(place.completed),
     rating: place.rating ?? null,
     reviewCount: place.reviewCount ?? null,
+  };
+}
+
+function compactMemory(memory: MemoryInput) {
+  return {
+    title: memory.title,
+    content: memory.content,
+    memoryType: memory.memoryType ?? null,
   };
 }
 
@@ -96,7 +119,14 @@ function buildFallbackPlan(input: PlanRequest, mode: AiMode) {
 function buildPrompt(input: PlanRequest, mode: AiMode) {
   const groupLabel = input.groupType === 'friends' ? '친구 모임' : '커플';
   const wishlist = JSON.stringify(activeWishlist(input).map(compactPlace), null, 2);
-  const community = JSON.stringify(topCommunity(input).map(compactPlace), null, 2);
+  const memories = JSON.stringify((input.memories ?? []).filter((memory) => memory.isAiUsable).slice(0, 16).map(compactMemory), null, 2);
+  const profiles = JSON.stringify((input.profiles ?? []).slice(0, 2), null, 2);
+  const community = [
+    JSON.stringify(topCommunity(input).map(compactPlace), null, 2),
+    '',
+    `Couple AI memory, only when explicitly user-approved: ${memories}`,
+    `Editable partner profiles: ${profiles}`,
+  ].join('\n');
   const userMessage = input.message?.trim() || '오늘 바로 실행할 수 있는 코스를 추천해줘.';
 
   const goal =

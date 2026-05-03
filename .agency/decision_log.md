@@ -94,3 +94,38 @@ Reason:
 - API-side count checks are not enough under concurrent invite acceptance.
 - Member-wide group UPDATE RLS would allow future client code to mutate operational fields.
 - Admin dashboards need a lockout guard before real operation.
+
+## [2026-05-03] Couple-Only MVP And Product Memory Docs
+
+Decision: Hide guest and friend-mode entry points for the normal MVP and store living product strategy under `docs/product/`.
+
+Reason:
+- The strongest product wedge is a private couple memory and AI date companion, not generic group planning.
+- Guest localStorage undermines the promise of persistent shared couple data.
+- Product, monetization, marketing, and UX decisions need a durable home separate from execution handoffs.
+
+## [2026-05-03] Use Group-Scoped Wishlist Persistence
+
+Decision: Add `group_wishlist` as the canonical logged-in wishlist table instead of forcing the old `wishlist.couple_id` table into the current `groups` model.
+
+Reason:
+- Current auth and invite APIs already create `groups` and `group_members`.
+- The legacy `wishlist` table points at `couples`, which would create a second relationship model.
+- Group-scoped persistence keeps future friend-mode compatibility while the UI stays couple-only.
+
+## [2026-05-04] Review Media Is Private Storage Plus DB Metadata
+
+Decision: Store image/video binaries in the private `review-media` Supabase Storage bucket and store only paths and metadata in Postgres.
+
+Reason:
+- Large media does not belong in Postgres rows.
+- A private bucket plus signed URL/API mediation preserves the public/private split.
+- Public reviews can expose media intentionally, while private couple media remains group-scoped.
+
+## [2026-05-04] Advanced Couple AI Requires Editable Memory
+
+Decision: Gift recommendations, conflict support, and partner profile summaries are product-aligned only if built on opt-in, editable couple memory.
+
+Reason:
+- These features strengthen the core "AI that remembers your couple" value proposition.
+- They become risky if the app silently judges personality, diagnoses users, or stores hidden inferences.

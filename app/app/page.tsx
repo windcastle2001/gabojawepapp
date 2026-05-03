@@ -10,9 +10,11 @@ import {
   getSession,
   getWishlist,
   saveSession,
+  type AddWishInput,
   type PrototypeSession,
   type PrototypeWish,
 } from '@/lib/prototype-store';
+import { addRemoteWish, getRemoteAppSummary } from '@/lib/remote-store';
 
 const CATEGORY_EMOJI: Record<string, string> = {
   카페: '☕',
@@ -59,8 +61,15 @@ export default function HomePage() {
 
   useEffect(() => {
     const sync = () => {
-      setSession(getSession());
-      setWishlist(getWishlist());
+      const nextSession = getSession();
+      setSession(nextSession);
+      if (nextSession.authMode === 'google') {
+        getRemoteAppSummary()
+          .then((summary) => setWishlist(summary.recentWishlist))
+          .catch(() => setWishlist(getWishlist()));
+      } else {
+        setWishlist(getWishlist());
+      }
     };
     sync();
     window.addEventListener('dm-store-change', sync);
@@ -107,7 +116,7 @@ export default function HomePage() {
         const data = await response.json();
         if (!response.ok || !data.data) throw new Error(data.error ?? '링크를 분석하지 못했어요.');
 
-        addWishFromPlace({
+        const capturedWish: AddWishInput = {
           title: data.data.title,
           category: data.data.category ?? '액티비티',
           address: data.data.address ?? null,
@@ -117,23 +126,36 @@ export default function HomePage() {
           sourceType: 'shared_link',
           sourceLabel: '공유 링크',
           sourceUrl: data.data.source_url ?? raw,
-        });
+        };
+        if (session.authMode === 'google') {
+          const saved = await addRemoteWish(capturedWish);
+          setWishlist((items) => [saved, ...items.filter((item) => item.id !== saved.id)].slice(0, 3));
+        } else {
+          addWishFromPlace(capturedWish);
+          setWishlist(getWishlist());
+        }
         setToast('링크를 분석해서 위시리스트에 저장했어요.');
       } else {
-        addWishFromPlace({
+        const manualWish: AddWishInput = {
           title: raw,
           category: '액티비티',
           address: null,
           tags: ['직접입력'],
           sourceType: 'manual',
           sourceLabel: '직접 입력',
-        });
+        };
+        if (session.authMode === 'google') {
+          const saved = await addRemoteWish(manualWish);
+          setWishlist((items) => [saved, ...items.filter((item) => item.id !== saved.id)].slice(0, 3));
+        } else {
+          addWishFromPlace(manualWish);
+          setWishlist(getWishlist());
+        }
         setToast('위시리스트에 저장했어요.');
       }
 
       setInputValue('');
       textareaRef.current?.blur();
-      setWishlist(getWishlist());
     } catch (error) {
       setToast(error instanceof Error ? error.message : '저장 중 문제가 생겼어요.');
     } finally {

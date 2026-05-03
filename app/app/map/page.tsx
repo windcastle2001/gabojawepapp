@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { LocateFixed, MapPinPlus, Search, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { CommunityPlace } from '@/components/map/types';
+import { addRemoteCommunityPlace, addRemoteWish, listRemoteCommunityPlaces } from '@/lib/remote-store';
 import {
   addCommunityPlace,
   addWishFromPlace,
@@ -286,11 +287,30 @@ export default function CommunityMapPage() {
   useEffect(() => {
     const sync = () => {
       setSession(getSession());
-      setPlaces(getCommunityPlaces());
+      const nextSession = getSession();
+      setSession(nextSession);
+      if (nextSession.authMode === 'google') {
+        listRemoteCommunityPlaces()
+          .then((remotePlaces) => setPlaces(remotePlaces))
+          .catch(() => setPlaces(getCommunityPlaces()));
+      } else {
+        setPlaces(getCommunityPlaces());
+      }
     };
     sync();
     window.addEventListener('dm-store-change', sync);
     return () => window.removeEventListener('dm-store-change', sync);
+  }, []);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+      },
+      () => undefined,
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
   }, []);
 
   useEffect(() => {
@@ -328,7 +348,23 @@ export default function CommunityMapPage() {
     return [...communityMarkers, ...searchMarkers];
   }, [filteredPlaces, searchResults]);
 
-  function handleAddWish(place: { title: string; category: string; address: string; lat: number; lng: number; sourceUrl?: string | null }) {
+  async function handleAddWish(place: { title: string; category: string; address: string; lat: number; lng: number; sourceUrl?: string | null }) {
+    if (session?.authMode === 'google') {
+      await addRemoteWish({
+        title: place.title,
+        category: place.category,
+        address: place.address,
+        lat: place.lat,
+        lng: place.lng,
+        tags: ['커뮤니티맵'],
+        sourceType: 'community',
+        sourceLabel: '커뮤니티 맵',
+        sourceUrl: place.sourceUrl ?? null,
+      });
+      setToast('위시리스트에 추가했어요.');
+      setSelectedPlace(null);
+      return;
+    }
     const added = addWishFromPlace({
       title: place.title,
       category: place.category,
@@ -415,9 +451,22 @@ export default function CommunityMapPage() {
     }
   }
 
-  function handleReportSubmit(value: AddCommunityPlaceInput, saveWish: boolean) {
-    const created = addCommunityPlace(value, session ?? undefined);
+  async function handleReportSubmit(value: AddCommunityPlaceInput, saveWish: boolean) {
+    const created = session?.authMode === 'google' ? await addRemoteCommunityPlace(value) : addCommunityPlace(value, session ?? undefined);
     if (saveWish) {
+      if (session?.authMode === 'google') {
+        await addRemoteWish({
+          title: created.title,
+          category: created.category,
+          address: created.address,
+          lat: created.lat,
+          lng: created.lng,
+          tags: ['커뮤니티맵'],
+          sourceType: value.sourceType ?? 'manual',
+          sourceLabel: value.sourceLabel ?? '제보 등록',
+          sourceUrl: value.sourceUrl ?? null,
+        });
+      } else {
       addWishFromPlace({
         title: created.title,
         category: created.category,
@@ -429,6 +478,10 @@ export default function CommunityMapPage() {
         sourceLabel: value.sourceLabel ?? '제보 등록',
         sourceUrl: value.sourceUrl ?? null,
       });
+      }
+    }
+    if (session?.authMode === 'google') {
+      setPlaces(await listRemoteCommunityPlaces());
     }
     setToast(saveWish ? '커뮤니티 맵과 위시리스트에 같이 저장했어요.' : '커뮤니티 맵에 제보했어요.');
     setShowReportModal(false);
@@ -459,6 +512,7 @@ export default function CommunityMapPage() {
       <div className="absolute inset-0 z-0">
         <CommunityMap
           places={mapPlaces}
+          userLocation={userLocation}
           onPlaceSelect={(place) => {
             const communityPlace = places.find((item) => item.id === place.id);
             if (communityPlace) {

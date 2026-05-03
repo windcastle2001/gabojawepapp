@@ -20,10 +20,11 @@ const CATEGORY_EMOJI: Record<string, string> = {
 interface LeafletMapProps {
   places: CommunityPlace[];
   onPlaceSelect: (place: CommunityPlace) => void;
-  selectedId: number | null;
+  selectedId: number | string | null;
+  userLocation?: { lat: number; lng: number } | null;
 }
 
-export function LeafletMap({ places, onPlaceSelect, selectedId }: LeafletMapProps) {
+export function LeafletMap({ places, onPlaceSelect, selectedId, userLocation }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<unknown>(null);
   const markersRef = useRef<unknown[]>([]);
@@ -40,8 +41,8 @@ export function LeafletMap({ places, onPlaceSelect, selectedId }: LeafletMapProp
       });
 
       const map = L.map(containerRef.current!, {
-        center: [37.5665, 126.978],
-        zoom: 12,
+        center: userLocation ? [userLocation.lat, userLocation.lng] : [37.5665, 126.978],
+        zoom: userLocation ? 15 : 12,
         zoomControl: true,
       });
 
@@ -62,7 +63,7 @@ export function LeafletMap({ places, onPlaceSelect, selectedId }: LeafletMapProp
         markersRef.current = [];
       }
     };
-  }, []);
+  }, [userLocation]);
 
   useEffect(() => {
     if (!mapRef.current) return;
@@ -103,8 +104,12 @@ export function LeafletMap({ places, onPlaceSelect, selectedId }: LeafletMapProp
         marker.on('click', () => onPlaceSelect(place));
         markersRef.current.push(marker);
       });
+
+      if (userLocation) {
+        (mapRef.current as L.Map).setView([userLocation.lat, userLocation.lng], 15, { animate: true });
+      }
     });
-  }, [onPlaceSelect, places]);
+  }, [onPlaceSelect, places, userLocation]);
 
   useEffect(() => {
     if (!mapRef.current || !selectedId) return;

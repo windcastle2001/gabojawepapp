@@ -164,6 +164,12 @@ export type Database = {
           rating: number | null;
           review_count: number;
           contributed_by: string | null;
+          country_code: string;
+          region: string | null;
+          locale: string;
+          place_provider: string | null;
+          provider_place_id: string | null;
+          source_url: string | null;
           created_at: string;
         };
         Insert: {
@@ -176,6 +182,12 @@ export type Database = {
           rating?: number | null;
           review_count?: number;
           contributed_by?: string | null;
+          country_code?: string;
+          region?: string | null;
+          locale?: string;
+          place_provider?: string | null;
+          provider_place_id?: string | null;
+          source_url?: string | null;
           created_at?: string;
         };
         Update: {
@@ -188,7 +200,217 @@ export type Database = {
           rating?: number | null;
           review_count?: number;
           contributed_by?: string | null;
+          country_code?: string;
+          region?: string | null;
+          locale?: string;
+          place_provider?: string | null;
+          provider_place_id?: string | null;
+          source_url?: string | null;
           created_at?: string;
+        };
+        Relationships: [];
+      };
+      partner_profiles: {
+        Row: {
+          id: string;
+          group_id: string;
+          user_id: string;
+          display_name: string | null;
+          birthday: string | null;
+          mbti:
+            | 'INTJ' | 'INTP' | 'ENTJ' | 'ENTP'
+            | 'INFJ' | 'INFP' | 'ENFJ' | 'ENFP'
+            | 'ISTJ' | 'ISFJ' | 'ESTJ' | 'ESFJ'
+            | 'ISTP' | 'ISFP' | 'ESTP' | 'ESFP'
+            | null;
+          zodiac: string | null;
+          personality_summary: string | null;
+          gift_preferences: Json;
+          food_preferences: Json;
+          date_preferences: Json;
+          important_notes: string[];
+          ai_opt_in: boolean;
+          last_ai_refresh_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          group_id: string;
+          user_id: string;
+          display_name?: string | null;
+          birthday?: string | null;
+          mbti?:
+            | 'INTJ' | 'INTP' | 'ENTJ' | 'ENTP'
+            | 'INFJ' | 'INFP' | 'ENFJ' | 'ENFP'
+            | 'ISTJ' | 'ISFJ' | 'ESTJ' | 'ESFJ'
+            | 'ISTP' | 'ISFP' | 'ESTP' | 'ESFP'
+            | null;
+          zodiac?: string | null;
+          personality_summary?: string | null;
+          gift_preferences?: Json;
+          food_preferences?: Json;
+          date_preferences?: Json;
+          important_notes?: string[];
+          ai_opt_in?: boolean;
+          last_ai_refresh_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          group_id?: string;
+          user_id?: string;
+          display_name?: string | null;
+          birthday?: string | null;
+          mbti?:
+            | 'INTJ' | 'INTP' | 'ENTJ' | 'ENTP'
+            | 'INFJ' | 'INFP' | 'ENFJ' | 'ENFP'
+            | 'ISTJ' | 'ISFJ' | 'ESTJ' | 'ESFJ'
+            | 'ISTP' | 'ISFP' | 'ESTP' | 'ESFP'
+            | null;
+          zodiac?: string | null;
+          personality_summary?: string | null;
+          gift_preferences?: Json;
+          food_preferences?: Json;
+          date_preferences?: Json;
+          important_notes?: string[];
+          ai_opt_in?: boolean;
+          last_ai_refresh_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      couple_memories: {
+        Row: {
+          id: string;
+          group_id: string;
+          subject_user_id: string | null;
+          created_by: string;
+          memory_type: 'preference' | 'constraint' | 'gift' | 'conflict_style' | 'anniversary' | 'inside_joke' | 'place' | 'manual_note';
+          title: string;
+          content: string;
+          source_type: 'manual' | 'chat' | 'review' | 'wishlist' | 'ai_suggestion';
+          source_ref_id: string | null;
+          confidence: number;
+          visibility: 'couple' | 'self_only';
+          is_ai_usable: boolean;
+          archived_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          group_id: string;
+          subject_user_id?: string | null;
+          created_by: string;
+          memory_type?: 'preference' | 'constraint' | 'gift' | 'conflict_style' | 'anniversary' | 'inside_joke' | 'place' | 'manual_note';
+          title: string;
+          content: string;
+          source_type?: 'manual' | 'chat' | 'review' | 'wishlist' | 'ai_suggestion';
+          source_ref_id?: string | null;
+          confidence?: number;
+          visibility?: 'couple' | 'self_only';
+          is_ai_usable?: boolean;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          group_id?: string;
+          subject_user_id?: string | null;
+          created_by?: string;
+          memory_type?: 'preference' | 'constraint' | 'gift' | 'conflict_style' | 'anniversary' | 'inside_joke' | 'place' | 'manual_note';
+          title?: string;
+          content?: string;
+          source_type?: 'manual' | 'chat' | 'review' | 'wishlist' | 'ai_suggestion';
+          source_ref_id?: string | null;
+          confidence?: number;
+          visibility?: 'couple' | 'self_only';
+          is_ai_usable?: boolean;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      group_wishlist: {
+        Row: {
+          id: string;
+          group_id: string;
+          title: string;
+          item_type: 'place' | 'activity';
+          category: string;
+          address: string | null;
+          lat: number | null;
+          lng: number | null;
+          tags: string[];
+          added_by: string;
+          source_type: string;
+          source_label: string | null;
+          source_url: string | null;
+          is_completed: boolean;
+          completed_at: string | null;
+          completed_by: string | null;
+          rating: number | null;
+          review_content: string | null;
+          amount: number | null;
+          currency: string;
+          shared_review_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          group_id: string;
+          title: string;
+          item_type?: 'place' | 'activity';
+          category?: string;
+          address?: string | null;
+          lat?: number | null;
+          lng?: number | null;
+          tags?: string[];
+          added_by: string;
+          source_type?: string;
+          source_label?: string | null;
+          source_url?: string | null;
+          is_completed?: boolean;
+          completed_at?: string | null;
+          completed_by?: string | null;
+          rating?: number | null;
+          review_content?: string | null;
+          amount?: number | null;
+          currency?: string;
+          shared_review_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          group_id?: string;
+          title?: string;
+          item_type?: 'place' | 'activity';
+          category?: string;
+          address?: string | null;
+          lat?: number | null;
+          lng?: number | null;
+          tags?: string[];
+          added_by?: string;
+          source_type?: string;
+          source_label?: string | null;
+          source_url?: string | null;
+          is_completed?: boolean;
+          completed_at?: string | null;
+          completed_by?: string | null;
+          rating?: number | null;
+          review_content?: string | null;
+          amount?: number | null;
+          currency?: string;
+          shared_review_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -266,6 +488,11 @@ export type Database = {
           content: string | null;
           image_urls: string[] | null;
           is_public: boolean;
+          amount: number | null;
+          currency: string;
+          original_language: string;
+          translations: Json;
+          recommendation_count: number;
           created_at: string;
           updated_at: string;
         };
@@ -279,6 +506,11 @@ export type Database = {
           content?: string | null;
           image_urls?: string[] | null;
           is_public?: boolean;
+          amount?: number | null;
+          currency?: string;
+          original_language?: string;
+          translations?: Json;
+          recommendation_count?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -292,8 +524,64 @@ export type Database = {
           content?: string | null;
           image_urls?: string[] | null;
           is_public?: boolean;
+          amount?: number | null;
+          currency?: string;
+          original_language?: string;
+          translations?: Json;
+          recommendation_count?: number;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      review_media: {
+        Row: {
+          id: string;
+          review_id: string;
+          media_type: 'image' | 'video';
+          storage_path: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          review_id: string;
+          media_type: 'image' | 'video';
+          storage_path: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          review_id?: string;
+          media_type?: 'image' | 'video';
+          storage_path?: string;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      review_votes: {
+        Row: {
+          id: string;
+          review_id: string;
+          user_id: string;
+          vote_type: 'recommend';
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          review_id: string;
+          user_id: string;
+          vote_type?: 'recommend';
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          review_id?: string;
+          user_id?: string;
+          vote_type?: 'recommend';
+          created_at?: string;
         };
         Relationships: [];
       };

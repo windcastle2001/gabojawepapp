@@ -1,5 +1,5 @@
 export interface CommunityPlace {
-  id: number;
+  id: number | string;
   title: string;
   category: string;
   address: string;

@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ClipboardList, Link2, MapPin, Sparkles, Wand2 } from 'lucide-react';
 import { Button, Card } from '@/components/ui';
 import { getCommunityPlaces, getSession, getWishlist, type PrototypeSession } from '@/lib/prototype-store';
+import { getRemoteAiMemory, listRemoteCommunityPlaces, listRemoteWishlist } from '@/lib/remote-store';
 import { cn } from '@/lib/utils';
 
 type Segment = 'plan' | 'wishlist' | 'extract';
@@ -107,12 +108,31 @@ function fallbackText(segment: Segment) {
   return '오늘 바로 실행할 수 있는 코스를 추천해줘';
 }
 
+async function loadAiContext(session: PrototypeSession) {
+  if (session.authMode !== 'google') {
+    return {
+      wishlist: getWishlist(),
+      communityPlaces: getCommunityPlaces(),
+      profiles: [],
+      memories: [],
+    };
+  }
+
+  const [wishlist, communityPlaces, memory] = await Promise.all([
+    listRemoteWishlist(),
+    listRemoteCommunityPlaces(),
+    getRemoteAiMemory().catch(() => ({ profiles: [], memories: [] })),
+  ]);
+  return { wishlist, communityPlaces, profiles: memory.profiles, memories: memory.memories };
+}
+
 export default function AIPage() {
   const [session, setSession] = useState<PrototypeSession | null>(null);
   const [segment, setSegment] = useState<Segment>('plan');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [counts, setCounts] = useState({ wishlist: 0, community: 0 });
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -122,18 +142,36 @@ export default function AIPage() {
   }, []);
 
   useEffect(() => {
+    if (!session) return;
+    let cancelled = false;
+    loadAiContext(session)
+      .then((context) => {
+        if (!cancelled) {
+          setCounts({
+            wishlist: context.wishlist.filter((item) => !item.completed).length,
+            community: context.communityPlaces.length,
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          const wishlist = getWishlist();
+          setCounts({
+            wishlist: wishlist.filter((item) => !item.completed).length,
+            community: getCommunityPlaces().length,
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session, messages.length]);
+
+  useEffect(() => {
     if (listRef.current) {
       listRef.current.scrollTop = listRef.current.scrollHeight;
     }
   }, [messages, isTyping]);
-
-  const counts = useMemo(() => {
-    const wishlist = getWishlist();
-    return {
-      wishlist: wishlist.filter((item) => !item.completed).length,
-      community: getCommunityPlaces().length,
-    };
-  }, [session, messages.length]);
 
   async function runExtraction(rawUrl: string) {
     const url = rawUrl.trim();
@@ -193,6 +231,12 @@ export default function AIPage() {
         return;
       }
 
+      const context = await loadAiContext(session);
+      setCounts({
+        wishlist: context.wishlist.filter((item) => !item.completed).length,
+        community: context.communityPlaces.length,
+      });
+
       const response = await fetch('/api/ai/plan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -200,19 +244,32 @@ export default function AIPage() {
           mode: nextSegment,
           message,
           groupType: session.groupType,
-          wishlist: getWishlist().map((item) => ({
+          wishlist: context.wishlist.map((item) => ({
             title: item.title,
             category: item.category,
             address: item.address,
             tags: item.tags,
             completed: item.completed,
           })),
-          communityPlaces: getCommunityPlaces().map((place) => ({
+          communityPlaces: context.communityPlaces.map((place) => ({
             title: place.title,
             category: place.category,
             address: place.address,
             rating: place.rating,
             reviewCount: place.reviewCount,
+          })),
+          profiles: context.profiles.map((profile) => ({
+            displayName: profile.display_name,
+            mbti: profile.mbti,
+            zodiac: profile.zodiac,
+            personalitySummary: profile.personality_summary,
+            importantNotes: profile.important_notes,
+          })),
+          memories: context.memories.map((memory) => ({
+            title: memory.title,
+            content: memory.content,
+            memoryType: memory.memory_type,
+            isAiUsable: memory.is_ai_usable,
           })),
         }),
       });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Card } from '@/components/ui';
 import { createPrototypeSession, saveSession, type AuthMode, type GroupType } from '@/lib/prototype-store';
@@ -91,11 +91,16 @@ export default function LoginPage() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isEntering, setIsEntering] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const oauthBootstrapStarted = useRef(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('auth') === 'google') {
+    if (params.get('auth') === 'google' && !oauthBootstrapStarted.current) {
+      oauthBootstrapStarted.current = true;
       setAuthMode('google');
+      const pendingGroupType = 'couple';
+      setGroupType(pendingGroupType);
+      enterApp('google', pendingGroupType);
     }
     if (params.get('error')) {
       setAuthError('Google 로그인 처리 중 문제가 생겼어요. 잠시 뒤 다시 시도해 주세요.');
@@ -135,6 +140,7 @@ export default function LoginPage() {
       }
 
       router.push('/app');
+      window.localStorage.removeItem('dm_pending_group_type');
     } catch (error) {
       console.error(error);
       setAuthError(error instanceof Error ? error.message : '공간 생성 중 문제가 생겼어요.');
@@ -150,6 +156,7 @@ export default function LoginPage() {
     try {
       const supabase = createClient();
       const origin = window.location.origin;
+      window.localStorage.setItem('dm_pending_group_type', 'couple');
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -207,17 +214,11 @@ export default function LoginPage() {
                 <GoogleIcon />
                 {isGoogleLoading ? 'Google로 이동 중...' : 'Google로 시작하기'}
               </Button>
-              <Button variant="outline" onClick={() => setAuthMode('guest')} className="w-full" aria-label="로그인 없이 둘러보기">
-                로그인 없이 둘러보기
-              </Button>
               {authError && (
                 <p className="rounded-xl bg-destructive/10 px-3 py-2 text-center text-xs font-medium text-destructive">
                   {authError}
                 </p>
               )}
-              <p className="text-center text-xs text-muted-foreground">
-                둘러보기 모드에서는 커뮤니티 지도 확인이 가능하고, 초대와 AI 추천은 로그인 후 사용할 수 있어요.
-              </p>
             </div>
           </>
         ) : (
@@ -233,7 +234,6 @@ export default function LoginPage() {
 
             <div className="space-y-3">
               <ModeCard type="couple" selected={groupType === 'couple'} onClick={() => setGroupType('couple')} />
-              <ModeCard type="friends" selected={groupType === 'friends'} onClick={() => setGroupType('friends')} />
             </div>
 
             <div className="mt-auto grid grid-cols-[auto,1fr] gap-3 pt-8">
@@ -242,11 +242,11 @@ export default function LoginPage() {
               </Button>
               <Button
                 onClick={() => enterApp(authMode, groupType)}
-                variant={groupType === 'friends' ? 'secondary' : 'default'}
+                variant="default"
                 disabled={isEntering}
                 isLoading={isEntering}
               >
-                {groupType === 'couple' ? '커플 공간 시작하기' : '친구 모임 시작하기'}
+                커플 공간 시작하기
               </Button>
             </div>
             {authError && (

@@ -7,7 +7,8 @@ interface KakaoMapProps {
   appKey: string;
   places: CommunityPlace[];
   onPlaceSelect: (place: CommunityPlace) => void;
-  selectedId: number | null;
+  selectedId: number | string | null;
+  userLocation?: { lat: number; lng: number } | null;
   onLoadError?: (message: string) => void;
 }
 
@@ -93,7 +94,7 @@ async function getKakaoStatusMessage() {
   }
 }
 
-export function KakaoMap({ appKey, places, onPlaceSelect, selectedId, onLoadError }: KakaoMapProps) {
+export function KakaoMap({ appKey, places, onPlaceSelect, selectedId, userLocation, onLoadError }: KakaoMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<InstanceType<NonNullable<typeof window.kakao>['maps']['Map']> | null>(null);
   const markersRef = useRef<Array<{ setMap: (map: unknown | null) => void }>>([]);
@@ -117,8 +118,12 @@ export function KakaoMap({ appKey, places, onPlaceSelect, selectedId, onLoadErro
         if (disposed || !containerRef.current || !window.kakao?.maps) return;
         const { maps } = window.kakao;
         const firstPlace = places[0];
-        const center = firstPlace ? new maps.LatLng(firstPlace.lat, firstPlace.lng) : new maps.LatLng(37.5665, 126.978);
-        const map = new maps.Map(containerRef.current, { center, level: firstPlace ? 5 : 7 });
+        const center = userLocation
+          ? new maps.LatLng(userLocation.lat, userLocation.lng)
+          : firstPlace
+            ? new maps.LatLng(firstPlace.lat, firstPlace.lng)
+            : new maps.LatLng(37.5665, 126.978);
+        const map = new maps.Map(containerRef.current, { center, level: userLocation ? 4 : firstPlace ? 5 : 7 });
         mapRef.current = map;
         setLoadError(null);
         setDiagnosticMessage(null);
@@ -140,7 +145,7 @@ export function KakaoMap({ appKey, places, onPlaceSelect, selectedId, onLoadErro
       infoWindowRef.current = null;
       mapRef.current = null;
     };
-  }, [appKey, onLoadError]);
+  }, [appKey, onLoadError, userLocation]);
 
   useEffect(() => {
     if (!mapRef.current || !window.kakao?.maps) return;
@@ -184,13 +189,22 @@ export function KakaoMap({ appKey, places, onPlaceSelect, selectedId, onLoadErro
       markersRef.current.push(marker);
     });
 
-    if (places.length > 1) {
+    if (userLocation) {
+      mapRef.current.setCenter(new maps.LatLng(userLocation.lat, userLocation.lng));
+      mapRef.current.setLevel(4);
+    } else if (places.length > 1) {
       mapRef.current.setBounds(bounds);
     } else if (places[0]) {
       mapRef.current.setCenter(new maps.LatLng(places[0].lat, places[0].lng));
       mapRef.current.setLevel(5);
     }
-  }, [onPlaceSelect, places]);
+  }, [onPlaceSelect, places, userLocation]);
+
+  useEffect(() => {
+    if (!mapRef.current || !window.kakao?.maps || !userLocation) return;
+    mapRef.current.setCenter(new window.kakao.maps.LatLng(userLocation.lat, userLocation.lng));
+    mapRef.current.setLevel(4);
+  }, [userLocation]);
 
   useEffect(() => {
     if (!mapRef.current || !window.kakao?.maps || !selectedPlace) return;

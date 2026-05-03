@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Check, MapPinned, Plus, RotateCcw, Search, Share2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { addRemoteWish, completeRemoteWish, listRemoteWishlist, reopenRemoteWish, shareRemoteWish } from '@/lib/remote-store';
 import {
   addWishFromPlace,
   completeWish,
   getSession,
   getWishlist,
+  saveWishlist,
   reopenWish,
   shareWishReviewToCommunity,
   type GroupType,
@@ -160,7 +162,7 @@ function WishCard({
   item: PrototypeWish;
   groupType: GroupType;
   onCompleteClick: (item: PrototypeWish) => void;
-  onReopen: (id: number) => void;
+  onReopen: (id: number | string) => void;
   onShareToMap: (item: PrototypeWish) => void;
 }) {
   const categoryEmoji = CATEGORY_EMOJI[item.category] ?? '📍';
@@ -237,13 +239,20 @@ export default function WishlistPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [reviewTarget, setReviewTarget] = useState<PrototypeWish | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
     const sync = () => {
       const nextSession = getSession();
       setSession(nextSession);
       setGroupType(nextSession.groupType ?? 'couple');
-      setItems(getWishlist());
+      if (nextSession.authMode === 'google') {
+        listRemoteWishlist()
+          .then((remoteItems) => setItems(remoteItems))
+          .catch(() => setItems(getWishlist()));
+      } else {
+        setItems(getWishlist());
+      }
     };
     sync();
     window.addEventListener('dm-store-change', sync);
@@ -255,6 +264,15 @@ export default function WishlistPage() {
     const timer = window.setTimeout(() => setToast(null), 2200);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (position) => setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude }),
+      () => undefined,
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  }, []);
 
   const filteredItems = useMemo(() => {
     const source = activeTab === 'wish' ? items.filter((item) => !item.completed) : items.filter((item) => item.completed);
@@ -269,25 +287,53 @@ export default function WishlistPage() {
   const pendingCount = items.filter((item) => !item.completed).length;
   const doneCount = items.filter((item) => item.completed).length;
 
-  function refreshWishlist() {
+  async function refreshWishlist() {
+    if (session?.authMode === 'google') {
+      try {
+        setItems(await listRemoteWishlist());
+        return;
+      } catch {
+        setToast('서버 위시를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.');
+      }
+    }
     setItems(getWishlist());
   }
 
-  function handleAddManualWish(payload: { title: string; category: string; address: string | null; tags: string[] }) {
+  async function handleAddManualWish(payload: { title: string; category: string; address: string | null; tags: string[] }) {
+    if (session?.authMode === 'google') {
+      await addRemoteWish({ ...payload, sourceType: 'manual', sourceLabel: '직접 저장', sourceUrl: null, type: payload.address ? 'place' : 'activity' });
+      await refreshWishlist();
+      setToast('위시리스트에 추가했어요.');
+      return;
+    }
     const added = addWishFromPlace({ ...payload, sourceType: 'manual', sourceLabel: '직접 저장', sourceUrl: null, type: payload.address ? 'place' : 'activity' });
     if (added) {
-      refreshWishlist();
+      void refreshWishlist();
       setToast('위시리스트에 추가했어요.');
     }
   }
 
-  function handleCompleteSave(rating: number, review: string, shareToCommunity: boolean) {
+  async function handleCompleteSave(rating: number, review: string, shareToCommunity: boolean) {
     if (!reviewTarget || !session) return;
+    if (session.authMode === 'google') {
+      const completed = await completeRemoteWish(String(reviewTarget.id), rating, review);
+      if (shareToCommunity) await shareRemoteWish(String(completed.id));
+      await refreshWishlist();
+      setToast(shareToCommunity ? '후기를 커뮤니티 맵에 공유했어요.' : '완료 목록으로 옮겼어요.');
+      setReviewTarget(null);
+      setActiveTab('done');
+      return;
+    }
     const completed = completeWish(reviewTarget.id, rating, review);
-    refreshWishlist();
+    let shareTarget = completed;
+    if (completed && completed.address && (!completed.lat || !completed.lng) && userLocation) {
+      shareTarget = { ...completed, lat: userLocation.lat, lng: userLocation.lng };
+      saveWishlist(getWishlist().map((item) => (item.id === completed.id ? shareTarget! : item)));
+    }
+    void refreshWishlist();
     if (completed && shareToCommunity) {
-      const shared = shareWishReviewToCommunity(completed, session);
-      refreshWishlist();
+      const shared = shareTarget ? shareWishReviewToCommunity(shareTarget, session) : false;
+      void refreshWishlist();
       setToast(shared ? '후기를 커뮤니티 맵에 공유했어요. 지도에 핀이 추가됩니다.' : '주소와 후기가 있어야 맵에 공유할 수 있어요.');
     } else {
       setToast('완료 목록으로 옮겼어요.');
@@ -296,16 +342,38 @@ export default function WishlistPage() {
     setActiveTab('done');
   }
 
-  function handleReopen(id: number) {
+  async function handleReopen(id: number | string) {
+    if (session?.authMode === 'google') {
+      await reopenRemoteWish(String(id));
+      await refreshWishlist();
+      setToast('다시 위시리스트로 돌렸어요.');
+      setActiveTab('wish');
+      return;
+    }
     reopenWish(id);
-    refreshWishlist();
+    void refreshWishlist();
     setToast('다시 위시리스트로 돌렸어요.');
     setActiveTab('wish');
   }
 
-  function handleShareToMap(item: PrototypeWish) {
+  async function handleShareToMap(item: PrototypeWish) {
     if (!session) return;
-    const ok = shareWishReviewToCommunity(item, session);
+    if (session.authMode === 'google') {
+      try {
+        await shareRemoteWish(String(item.id));
+        await refreshWishlist();
+        setToast('커뮤니티 맵에 공유했어요.');
+      } catch (error) {
+        setToast(error instanceof Error ? error.message : '커뮤니티 맵에 공유하지 못했어요.');
+      }
+      return;
+    }
+    let shareTarget = item;
+    if (item.address && (!item.lat || !item.lng) && userLocation) {
+      shareTarget = { ...item, lat: userLocation.lat, lng: userLocation.lng };
+      saveWishlist(getWishlist().map((wish) => (wish.id === item.id ? shareTarget : wish)));
+    }
+    const ok = shareWishReviewToCommunity(shareTarget, session);
     refreshWishlist();
     setToast(ok ? '커뮤니티 맵에 공유했어요.' : '주소와 후기가 있어야 커뮤니티 맵에 공유할 수 있어요.');
   }

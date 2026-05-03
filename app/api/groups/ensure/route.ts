@@ -68,8 +68,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '로그인이 필요합니다.' }, { status: 401 });
     }
 
-    const body = (await request.json().catch(() => ({}))) as { groupType?: AppGroupType };
-    const groupType = groupTypeFromValue(body.groupType);
+    await request.json().catch(() => ({}));
+    const groupType: AppGroupType = 'couple';
     const admin = getSupabaseAdmin();
 
     await ensureProfile(user);
@@ -100,9 +100,9 @@ export async function POST(request: Request) {
       const { data, error } = await admin
         .from('groups')
         .insert({
-          name: groupType === 'friends' ? '친구 모임' : '커플 공간',
+          name: '커플 공간',
           group_type: groupType,
-          max_members: groupType === 'friends' ? 10 : 2,
+          max_members: 2,
           invite_code: inviteCode,
           invite_expires_at: new Date(Date.now() + 1000 * 60 * 60 * 24 * 14).toISOString(),
           created_by: user.id,
